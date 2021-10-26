@@ -315,14 +315,17 @@ def orientation(img_path: str | Path | list,
         thread.join()
 
         plot_histogram(h_max, 'Main orientation, fast ST method',
-                       folder / 'Main_fastST.svg' if folder is not None
-                       else None)
+                       folder / (path.name.replace('.npy', '') +
+                                 '_main_fastST.svg') if folder is
+                       not None else None)
         plot_histogram(h_int, 'Second orientation, fast ST method',
-                       folder / 'Second_fastST.svg' if folder is not None
-                       else None)
+                       folder / (path.name.replace('.npy', '') +
+                                 '_second_fastST.svg') if folder is
+                       not None else None)
         plot_histogram(h_min, 'Third orientation, fast ST method',
-                       folder / 'Third_fastST.svg' if folder is not None
-                       else None)
+                       folder / (path.name.replace('.npy', '') +
+                                 '_third_fastST.svg') if folder is
+                       not None else None)
 
       elif method == 'gradient':
 
@@ -365,7 +368,9 @@ def orientation(img_path: str | Path | list,
         thread.join()
 
         plot_histogram(h, 'Main orientation, gradient method',
-                       folder / 'Main_grad.svg' if folder is not None else None)
+                       folder / (path.name.replace('.npy', '') +
+                                 '_main_grad.svg') if folder is not
+                       None else None)
 
     else:
       # Spatial derivatives
@@ -489,13 +494,16 @@ def orientation(img_path: str | Path | list,
       thread.join()
 
       plot_histogram(h_max, 'Main orientation, exact ST method',
-                     folder / 'Main_exactST.svg' if folder is not None
-                     else None)
+                     folder / (path.name.replace('.npy', '') +
+                               '_main_exactST.svg') if folder is not
+                     None else None)
       plot_histogram(h_int, 'Second orientation, exact ST method',
-                     folder / 'Second_exactST.svg' if folder is not None
-                     else None)
+                     folder / (path.name.replace('.npy', '') +
+                               '_second_exactST.svg') if folder is
+                     not None else None)
       plot_histogram(h_min, 'Third orientation, exact ST method',
-                     folder / 'Third_exactST.svg' if folder is not None
-                     else None)
+                     folder / (path.name.replace('.npy', '') +
+                               '_third_exactST.svg') if folder is
+                     not None else None)
 
     plt.show()
