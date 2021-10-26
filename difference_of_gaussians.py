@@ -2,9 +2,9 @@
 
 from functools import partial
 from pathlib import Path
-from numpy import load, uint8, save, flip, concatenate, eye, array, newaxis
+from numpy import load, uint8, save, flip, eye
 from scipy.ndimage.filters import gaussian_filter
-from dask.array import from_array, subtract, map_overlap
+from dask.array import from_array, subtract, map_overlap, zeros
 from dask.distributed import Client, LocalCluster
 
 from PyQt5.QtWidgets import QMainWindow
@@ -55,7 +55,7 @@ class DoG(QObject):
     self.finished.emit()
 
 
-class DoG_interface_3D(QMainWindow):
+class DoG_interface(QMainWindow):
   """An interface for easily visualizing the difference of gaussians on a 3D
   image with various sigma values."""
 
@@ -80,8 +80,7 @@ class DoG_interface_3D(QMainWindow):
 
     # If no file was selected, displaying a black image and disabling commands
     if file == '':
-      self._img = concatenate(array([(eye(500) + flip(eye(500), axis=0))
-                                     [:, :, newaxis]] * 15), axis=2)
+      self._img = eye(500) + flip(eye(500), axis=0)
       QMessageBox(QMessageBox.Warning, 'No file selected',
                   'No file selected !\nAll commands are disabled.').exec()
       self._enable = False
@@ -89,6 +88,11 @@ class DoG_interface_3D(QMainWindow):
       self._file = file
       self._img = load(file)
       self._enable = True
+
+    # Dimension of the image
+    self._dimension = len(self._img.shape)
+    if self._dimension not in [2, 3]:
+      raise IOError("The image should be a 2D or 3D gray level image.")
 
     # Starting the dask client
     cluster = LocalCluster(processes=False,
@@ -125,9 +129,14 @@ class DoG_interface_3D(QMainWindow):
 
     # Widget containing the image to display
     self._label = QLabel()
-    height, width, depth = self._img_filtered.shape
-    q_img = QImage(self._img_filtered[:, :, int(depth / 2)].astype(uint8),
-                   width, height, width, QImage.Format_Grayscale8)
+    if self._dimension == 2:
+      height, width = self._img_filtered.shape
+      q_img = QImage(self._img_filtered.astype(uint8), width, height, width,
+                     QImage.Format_Grayscale8)
+    else:
+      height, width, depth = self._img_filtered.shape
+      q_img = QImage(self._img_filtered[:, :, int(depth / 2)].astype(uint8),
+                     width, height, width, QImage.Format_Grayscale8)
     self._image = QPixmap(q_img)
     self._image = self._image.scaledToHeight(int(
         QDesktopWidget().availableGeometry().height() - 250))
@@ -136,16 +145,17 @@ class DoG_interface_3D(QMainWindow):
     self._general_layout.addWidget(self._label)
 
     # Slider for the slice selection
-    self._general_layout.addWidget(QLabel("Slice selection :"))
-    self._slider_layout = QHBoxLayout()
-    self._slider_layout.addWidget(QLabel("0"))
-    self._slider = QSlider(Qt.Horizontal)
-    self._slider.setMinimum(0)
-    self._slider.setMaximum(depth - 1)
-    self._slider.setValue(int(depth / 2))
-    self._slider_layout.addWidget(self._slider)
-    self._slider_layout.addWidget(QLabel(str(self._img.shape[2])))
-    self._general_layout.addLayout(self._slider_layout)
+    if self._dimension == 3:
+      self._general_layout.addWidget(QLabel("Slice selection :"))
+      self._slider_layout = QHBoxLayout()
+      self._slider_layout.addWidget(QLabel("0"))
+      self._slider = QSlider(Qt.Horizontal)
+      self._slider.setMinimum(0)
+      self._slider.setMaximum(depth - 1)
+      self._slider.setValue(int(depth / 2))
+      self._slider_layout.addWidget(self._slider)
+      self._slider_layout.addWidget(QLabel(str(self._img.shape[2])))
+      self._general_layout.addLayout(self._slider_layout)
 
     # Slider for choosing sigma 1
     self._slider_1_layout.addWidget(QLabel("Sigma 1 :"))
@@ -193,7 +203,8 @@ class DoG_interface_3D(QMainWindow):
     # Disabling the sliders and buttons if no image was selected
     self._slider_1.setEnabled(self._enable)
     self._slider_2.setEnabled(self._enable)
-    self._slider.setEnabled(self._enable)
+    if self._dimension == 3:
+      self._slider.setEnabled(self._enable)
     self._save_button.setEnabled(self._enable)
 
   def _set_connections(self) -> None:
@@ -213,7 +224,8 @@ class DoG_interface_3D(QMainWindow):
     self._slider_2.sliderReleased.connect(self._handle_dog)
 
     # Updates the display with the current slide
-    self._slider.valueChanged.connect(self.update_image)
+    if self._dimension == 3:
+      self._slider.valueChanged.connect(self.update_image)
 
   def _slider_1_management(self) -> None:
     """Keeps sigma 1 < sigma 2 and updates the displayed value."""
@@ -236,9 +248,15 @@ class DoG_interface_3D(QMainWindow):
     slice."""
 
     # Generating a QImage object containing the image
-    height, width, depth = self._img_filtered.shape
-    q_img = QImage(self._img_filtered[:, :, self._slider.value()].astype(uint8),
-                   width, height, width, QImage.Format_Grayscale8)
+    if self._dimension == 2:
+      height, width = self._img_filtered.shape
+      q_img = QImage(self._img_filtered.astype(uint8),
+                     width, height, width, QImage.Format_Grayscale8)
+    else:
+      height, width, _ = self._img_filtered.shape
+      q_img = QImage(
+        self._img_filtered[:, :, self._slider.value()].astype(uint8),
+        width, height, width, QImage.Format_Grayscale8)
     self._image = QPixmap(q_img)
     # Rescaling the image to keep a constant window size
     self._image = self._image.scaledToHeight(int(
@@ -252,7 +270,8 @@ class DoG_interface_3D(QMainWindow):
     # Disabling the sliders and button
     self._slider_1.setEnabled(False)
     self._slider_2.setEnabled(False)
-    self._slider.setEnabled(False)
+    if self._dimension == 3:
+      self._slider.setEnabled(False)
     self._save_button.setEnabled(False)
 
     # Creating a _thread for running the DoG calculation in parallel
@@ -273,7 +292,8 @@ class DoG_interface_3D(QMainWindow):
     # The sliders and buttons are only re-enabled once the _thread finishes
     self._thread.finished.connect(lambda: self._slider_1.setEnabled(True))
     self._thread.finished.connect(lambda: self._slider_2.setEnabled(True))
-    self._thread.finished.connect(lambda: self._slider.setEnabled(True))
+    if self._dimension == 3:
+      self._thread.finished.connect(lambda: self._slider.setEnabled(True))
     self._thread.finished.connect(lambda: self._save_button.setEnabled(True))
 
   def dog(self,
