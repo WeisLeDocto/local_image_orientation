@@ -134,3 +134,4 @@ dmypy.json
 npy/
 svg/
 tif/
+dask-worker-space/
