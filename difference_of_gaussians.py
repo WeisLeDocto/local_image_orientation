@@ -306,8 +306,11 @@ class DoG_interface(QMainWindow):
                                         sigma=sigma_1, depth=15),
                             map_overlap(gaussian_filter, img,
                                         sigma=sigma_2, depth=15))
-    img_filtered = 255 * (img_filtered - img_filtered.min()) / \
-        (img_filtered.max() - img_filtered.min())
+    if img_filtered.min() == img_filtered.max():
+      img_filtered = zeros(img_filtered.shape)
+    else:
+      img_filtered = 255 * (img_filtered - img_filtered.min()) / \
+          (img_filtered.max() - img_filtered.min())
     self._img_filtered = img_filtered.compute()
 
   def _save_image(self) -> None:
