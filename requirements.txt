@@ -1,0 +1,7 @@
+numpy>=1.21.2
+matplotlib>=3.4.3
+scipy>=1.5.4
+scikit-image>=0.17.2
+SimpleITK>=2.1.0
+dask>=2021.9.1
+PyQt5>=5.15.4
