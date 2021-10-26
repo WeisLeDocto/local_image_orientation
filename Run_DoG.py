@@ -2,7 +2,7 @@
 
 from sys import argv, exit
 from PyQt5.QtWidgets import QApplication
-from difference_of_gaussians import DoG_interface
+from local_image_orientation import DoG_interface
 
 if __name__ == "__main__":
   app = QApplication(argv)

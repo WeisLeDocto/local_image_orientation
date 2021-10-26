@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from orientation_analysis import orientation
+from local_image_orientation import orientation
 from pathlib import Path
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@ class DoG_interface(QMainWindow):
     self._max_sigma = max_sigma
 
     # Choosing the file to open
-    path = Path(__file__).parent / 'npy'
+    path = Path(__file__).parent.parent / 'npy'
     file = QFileDialog.getOpenFileName(caption="Select the 3D image to open",
                                        directory=str(path),
                                        options=QFileDialog.DontUseNativeDialog,
