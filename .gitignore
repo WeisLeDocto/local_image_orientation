@@ -132,6 +132,9 @@ dmypy.json
 
 .idea
 npy/*
+!npy/demo.npy
 svg/*
+!svg/demo_main_grad.svg
 tif/*
+!tif/demo.tif
 dask-worker-space/
