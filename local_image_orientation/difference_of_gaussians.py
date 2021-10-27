@@ -132,7 +132,7 @@ class DoG_interface(QMainWindow):
     # Widget containing the image to display
     self._label = QLabel()
     if self._dimension == 2:
-      height, width = self._img_filtered.shape
+      (height, width), depth = self._img_filtered.shape, 1
       q_img = QImage(self._img_filtered.astype(uint8), width, height, width,
                      QImage.Format_Grayscale8)
     else:
@@ -152,16 +152,16 @@ class DoG_interface(QMainWindow):
     self._general_layout.addWidget(self._checkbox)
 
     # Slider for the slice selection
+    self._general_layout.addWidget(QLabel("Slice selection :"))
+    self._slider_layout = QHBoxLayout()
+    self._slider_layout.addWidget(QLabel("0"))
+    self._slider = QSlider(Qt.Horizontal)
+    self._slider.setMinimum(0)
+    self._slider.setMaximum(depth - 1)
+    self._slider.setValue(int(depth / 2))
+    self._slider_layout.addWidget(self._slider)
+    self._slider_layout.addWidget(QLabel(str(depth)))
     if self._dimension == 3:
-      self._general_layout.addWidget(QLabel("Slice selection :"))
-      self._slider_layout = QHBoxLayout()
-      self._slider_layout.addWidget(QLabel("0"))
-      self._slider = QSlider(Qt.Horizontal)
-      self._slider.setMinimum(0)
-      self._slider.setMaximum(depth - 1)
-      self._slider.setValue(int(depth / 2))
-      self._slider_layout.addWidget(self._slider)
-      self._slider_layout.addWidget(QLabel(str(self._img.shape[2])))
       self._general_layout.addLayout(self._slider_layout)
 
     # Slider for choosing sigma 1
@@ -210,8 +210,7 @@ class DoG_interface(QMainWindow):
     # Disabling the sliders and buttons if no image was selected
     self._slider_1.setEnabled(self._enable)
     self._slider_2.setEnabled(self._enable)
-    if self._dimension == 3:
-      self._slider.setEnabled(self._enable)
+    self._slider.setEnabled(self._enable)
     self._save_button.setEnabled(self._enable)
     self._checkbox.setEnabled(self._enable)
 
@@ -235,8 +234,7 @@ class DoG_interface(QMainWindow):
     self._slider_2.sliderReleased.connect(self._handle_dog)
 
     # Updates the display with the current slide
-    if self._dimension == 3:
-      self._slider.valueChanged.connect(self.update_image)
+    self._slider.valueChanged.connect(self.update_image)
 
   def _slider_1_management(self) -> None:
     """Keeps sigma 1 < sigma 2 and updates the displayed value."""
@@ -258,9 +256,10 @@ class DoG_interface(QMainWindow):
     """Updates the image after computing the DoG or changing the current
     slice."""
 
+    height, width = self._img_filtered.shape[0], self._img_filtered.shape[1]
+
     # Generating a QImage object containing the image
     if self._dimension == 2:
-      height, width = self._img_filtered.shape
 
       # Displaying half the filtered half the original image
       if self._checkbox.isChecked():
@@ -275,7 +274,6 @@ class DoG_interface(QMainWindow):
                        width, height, width, QImage.Format_Grayscale8)
 
     else:
-      height, width, _ = self._img_filtered.shape
 
       # Displaying half the filtered half the original image
       if self._checkbox.isChecked():
@@ -304,8 +302,7 @@ class DoG_interface(QMainWindow):
     # Disabling the sliders and button
     self._slider_1.setEnabled(False)
     self._slider_2.setEnabled(False)
-    if self._dimension == 3:
-      self._slider.setEnabled(False)
+    self._slider.setEnabled(False)
     self._save_button.setEnabled(False)
     self._checkbox.setEnabled(False)
 
@@ -327,8 +324,7 @@ class DoG_interface(QMainWindow):
     # The sliders and buttons are only re-enabled once the _thread finishes
     self._thread.finished.connect(lambda: self._slider_1.setEnabled(True))
     self._thread.finished.connect(lambda: self._slider_2.setEnabled(True))
-    if self._dimension == 3:
-      self._thread.finished.connect(lambda: self._slider.setEnabled(True))
+    self._thread.finished.connect(lambda: self._slider.setEnabled(True))
     self._thread.finished.connect(lambda: self._save_button.setEnabled(True))
     self._thread.finished.connect(lambda: self._checkbox.setEnabled(True))
 
