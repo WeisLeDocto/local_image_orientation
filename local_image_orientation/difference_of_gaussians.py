@@ -330,7 +330,7 @@ class DoG_interface(QMainWindow):
     img = from_array(self._img)
 
     if init:
-      height, width, _ = img.shape
+      height, width = img.shape[0], img.shape[1]
       cast_img = 255 * (img[:, width // 2:] - img[:, width // 2:].min()) \
           / (img[:, width // 2:].max() - img[:, width // 2:].min())
       self._cast_img = cast_img.compute()
