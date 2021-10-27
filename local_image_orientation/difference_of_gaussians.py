@@ -1,8 +1,9 @@
 # coding: utf-8
 
+from __future__ import annotations
 from functools import partial
 from pathlib import Path
-from numpy import load, uint8, save, flip, eye, concatenate
+from numpy import load, uint8, save, flip, eye, concatenate, ndarray
 from scipy.ndimage.filters import gaussian_filter
 import dask.array as da
 from dask.distributed import Client, LocalCluster
@@ -334,7 +335,8 @@ class DoG_interface(QMainWindow):
   def dog(self,
           sigma_1: float,
           sigma_2: float,
-          init: bool = False) -> None:
+          init: bool = False,
+          save_: bool = False) -> None | ndarray:
     """Computes the DoG using dask.
 
     Also casts the original image to 8 bits for displaying it in the interface.
@@ -366,6 +368,10 @@ class DoG_interface(QMainWindow):
                                               sigma=sigma_1, depth=15),
                                da.map_overlap(gaussian_filter, img,
                                               sigma=sigma_2, depth=15))
+
+    # Only the DoG should be saved, not the aesthetic processing
+    if save_:
+      return img_filtered.compute()
 
     # In case the image is monochrome, making it black
     if img_filtered.min() == img_filtered.max():
@@ -410,7 +416,9 @@ class DoG_interface(QMainWindow):
     if not file.endswith('.npy'):
       file += '.npy'
 
-    save(file, self._img_filtered)
+    save(file, self.dog(self._slider_1.value() / 100 * self._max_sigma,
+                        self._slider_2.value() / 100 * self._max_sigma,
+                        save_=True))
 
     # Checking whether the file was successfully written, and displaying the
     # corresponding message
