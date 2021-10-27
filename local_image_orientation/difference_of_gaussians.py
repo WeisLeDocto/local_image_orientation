@@ -2,7 +2,7 @@
 
 from functools import partial
 from pathlib import Path
-from numpy import load, uint8, save, flip, eye
+from numpy import load, uint8, save, flip, eye, concatenate
 from scipy.ndimage.filters import gaussian_filter
 from dask.array import from_array, subtract, map_overlap, zeros
 from dask.distributed import Client, LocalCluster
@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QDesktopWidget
+from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import QSize, QObject, pyqtSignal
 from PyQt5.QtCore import Qt
@@ -102,7 +103,7 @@ class DoG_interface(QMainWindow):
 
     # Applying the first filter on the image
     self._img_filtered = self._img
-    self.dog(33 * self._max_sigma / 100, 66 * self._max_sigma / 100)
+    self.dog(33 * self._max_sigma / 100, 66 * self._max_sigma / 100, init=True)
 
     # Building the graphical interface
     self._set_layout()
@@ -143,6 +144,11 @@ class DoG_interface(QMainWindow):
     self._label.setPixmap(self._image)
     self._label.setStyleSheet("border: 1px solid black;")
     self._general_layout.addWidget(self._label)
+
+    # Checkbox for showing the original image
+    self._checkbox = QCheckBox("Show original")
+    self._checkbox.setChecked(False)
+    self._general_layout.addWidget(self._checkbox)
 
     # Slider for the slice selection
     if self._dimension == 3:
@@ -206,6 +212,7 @@ class DoG_interface(QMainWindow):
     if self._dimension == 3:
       self._slider.setEnabled(self._enable)
     self._save_button.setEnabled(self._enable)
+    self._checkbox.setEnabled(self._enable)
 
   def _set_connections(self) -> None:
     """Sets the actions triggered by the sliders and the button."""
@@ -214,6 +221,9 @@ class DoG_interface(QMainWindow):
     self._save_button.clicked.connect(partial(self._pass, None))
     # Saves the image
     self._save_button.clicked.connect(self._save_image)
+
+    # Update display when the checkbox is clicked
+    self._checkbox.clicked.connect(self.update_image)
 
     # this keeps sigma 1 > sigma 2
     self._slider_1.valueChanged.connect(self._slider_1_management)
@@ -250,13 +260,26 @@ class DoG_interface(QMainWindow):
     # Generating a QImage object containing the image
     if self._dimension == 2:
       height, width = self._img_filtered.shape
-      q_img = QImage(self._img_filtered.astype(uint8),
-                     width, height, width, QImage.Format_Grayscale8)
+      if self._checkbox.isChecked():
+        q_img = QImage(
+          concatenate((self._img_filtered[:, :width // 2], self._cast_img),
+                      axis=1).astype(uint8),
+          width, height, width, QImage.Format_Grayscale8)
+      else:
+        q_img = QImage(self._img_filtered.astype(uint8),
+                       width, height, width, QImage.Format_Grayscale8)
     else:
       height, width, _ = self._img_filtered.shape
-      q_img = QImage(
-        self._img_filtered[:, :, self._slider.value()].astype(uint8),
-        width, height, width, QImage.Format_Grayscale8)
+      if self._checkbox.isChecked():
+        q_img = QImage(
+          concatenate((self._img_filtered[:, :width // 2, self._slider.value()],
+                       self._cast_img[:, :, self._slider.value()]),
+                      axis=1).astype(uint8),
+          width, height, width, QImage.Format_Grayscale8)
+      else:
+        q_img = QImage(
+          self._img_filtered[:, :, self._slider.value()].astype(uint8),
+          width, height, width, QImage.Format_Grayscale8)
     self._image = QPixmap(q_img)
     # Rescaling the image to keep a constant window size
     self._image = self._image.scaledToHeight(int(
@@ -273,6 +296,7 @@ class DoG_interface(QMainWindow):
     if self._dimension == 3:
       self._slider.setEnabled(False)
     self._save_button.setEnabled(False)
+    self._checkbox.setEnabled(False)
 
     # Creating a _thread for running the DoG calculation in parallel
     self._thread = QThread()
@@ -295,22 +319,33 @@ class DoG_interface(QMainWindow):
     if self._dimension == 3:
       self._thread.finished.connect(lambda: self._slider.setEnabled(True))
     self._thread.finished.connect(lambda: self._save_button.setEnabled(True))
+    self._thread.finished.connect(lambda: self._checkbox.setEnabled(True))
 
   def dog(self,
           sigma_1: float,
-          sigma_2: float) -> None:
+          sigma_2: float,
+          init: bool = False) -> None:
     """Computes the DoG using dask."""
 
     img = from_array(self._img)
+
+    if init:
+      height, width, _ = img.shape
+      cast_img = 255 * (img[:, width // 2:] - img[:, width // 2:].min()) \
+          / (img[:, width // 2:].max() - img[:, width // 2:].min())
+      self._cast_img = cast_img.compute()
+
     img_filtered = subtract(map_overlap(gaussian_filter, img,
                                         sigma=sigma_1, depth=15),
                             map_overlap(gaussian_filter, img,
                                         sigma=sigma_2, depth=15))
+
     if img_filtered.min() == img_filtered.max():
       img_filtered = zeros(img_filtered.shape)
     else:
       img_filtered = 255 * (img_filtered - img_filtered.min()) / \
           (img_filtered.max() - img_filtered.min())
+
     self._img_filtered = img_filtered.compute()
 
   def _save_image(self) -> None:
