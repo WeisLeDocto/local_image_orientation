@@ -4,7 +4,7 @@ from functools import partial
 from pathlib import Path
 from numpy import load, uint8, save, flip, eye, concatenate
 from scipy.ndimage.filters import gaussian_filter
-from dask.array import from_array, subtract, map_overlap, zeros
+import dask.array as da
 from dask.distributed import Client, LocalCluster
 
 from PyQt5.QtWidgets import QMainWindow
@@ -260,26 +260,36 @@ class DoG_interface(QMainWindow):
     # Generating a QImage object containing the image
     if self._dimension == 2:
       height, width = self._img_filtered.shape
+
+      # Displaying half the filtered half the original image
       if self._checkbox.isChecked():
         q_img = QImage(
           concatenate((self._img_filtered[:, :width // 2], self._cast_img),
                       axis=1).astype(uint8),
-          width, height, width, QImage.Format_Grayscale8)
+          2 * (width // 2), height, 2 * (width // 2), QImage.Format_Grayscale8)
+
+      # Displaying only the filtered image
       else:
         q_img = QImage(self._img_filtered.astype(uint8),
                        width, height, width, QImage.Format_Grayscale8)
+
     else:
       height, width, _ = self._img_filtered.shape
+
+      # Displaying half the filtered half the original image
       if self._checkbox.isChecked():
         q_img = QImage(
           concatenate((self._img_filtered[:, :width // 2, self._slider.value()],
                        self._cast_img[:, :, self._slider.value()]),
                       axis=1).astype(uint8),
-          width, height, width, QImage.Format_Grayscale8)
+          2 * (width // 2), height, 2 * (width // 2), QImage.Format_Grayscale8)
+
+      # Displaying only the filtered image
       else:
         q_img = QImage(
           self._img_filtered[:, :, self._slider.value()].astype(uint8),
           width, height, width, QImage.Format_Grayscale8)
+
     self._image = QPixmap(q_img)
     # Rescaling the image to keep a constant window size
     self._image = self._image.scaledToHeight(int(
@@ -287,7 +297,7 @@ class DoG_interface(QMainWindow):
     self._label.setPixmap(self._image)
 
   def _handle_dog(self) -> None:
-    """runs the DoG in a separate thread and disables the commands while the
+    """Runs the DoG in a separate thread and disables the commands while the
     calculation is running."""
 
     # Disabling the sliders and button
@@ -325,26 +335,56 @@ class DoG_interface(QMainWindow):
           sigma_1: float,
           sigma_2: float,
           init: bool = False) -> None:
-    """Computes the DoG using dask."""
+    """Computes the DoG using dask.
 
-    img = from_array(self._img)
+    Also casts the original image to 8 bits for displaying it in the interface.
+    """
 
+    img = da.from_array(self._img)
+
+    # Casting the original image to 8 bits for displaying in the interface
     if init:
       height, width = img.shape[0], img.shape[1]
-      cast_img = 255 * (img[:, width // 2:] - img[:, width // 2:].min()) \
-          / (img[:, width // 2:].max() - img[:, width // 2:].min())
+      cast_img = 255 * (img[:, :width // 2] - img[:, :width // 2].min()) \
+          / (img[:, :width // 2].max() - img[:, :width // 2].min())
+
+      # Keeping only the relevant parts of the histogram
+      hist, _ = da.histogram(cast_img, range(256))
+      hist = hist / da.max(hist)
+      relevant = da.where(hist > 0.01)
+      mini, maxi = relevant[0].min(), relevant[0].max()
+
+      if mini != maxi:
+        cast_img[cast_img < mini] = mini
+        cast_img[cast_img > maxi] = maxi
+        cast_img = 255 * (cast_img - mini) / (maxi - mini)
+
       self._cast_img = cast_img.compute()
 
-    img_filtered = subtract(map_overlap(gaussian_filter, img,
-                                        sigma=sigma_1, depth=15),
-                            map_overlap(gaussian_filter, img,
-                                        sigma=sigma_2, depth=15))
+    # Actual filter
+    img_filtered = da.subtract(da.map_overlap(gaussian_filter, img,
+                                              sigma=sigma_1, depth=15),
+                               da.map_overlap(gaussian_filter, img,
+                                              sigma=sigma_2, depth=15))
 
+    # In case the image is monochrome, making it black
     if img_filtered.min() == img_filtered.max():
-      img_filtered = zeros(img_filtered.shape)
+      img_filtered = da.zeros(img_filtered.shape)
+    # Casting to 8 bits
     else:
       img_filtered = 255 * (img_filtered - img_filtered.min()) / \
           (img_filtered.max() - img_filtered.min())
+
+      # Keeping only the relevant parts of the histogram
+      hist, _ = da.histogram(img_filtered, range(256))
+      hist = hist / da.max(hist)
+      relevant = da.where(hist > 0.01)
+      mini, maxi = relevant[0].min(), relevant[0].max()
+
+      if mini != maxi:
+        img_filtered[img_filtered < mini] = mini
+        img_filtered[img_filtered > maxi] = maxi
+        img_filtered = 255 * (img_filtered - mini) / (maxi - mini)
 
     self._img_filtered = img_filtered.compute()
 
