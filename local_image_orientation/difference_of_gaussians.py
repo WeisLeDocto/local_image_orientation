@@ -393,8 +393,9 @@ class DoG_interface(QMainWindow):
     # Casting the original image to 8 bits for displaying in the interface
     if init:
       height, width = img.shape[0], img.shape[1]
-      cast_img = 255 * (img[:, :width // 2] - img[:, :width // 2].min()) \
+      cast_img = (img[:, :width // 2] - img[:, :width // 2].min()) \
           / (img[:, :width // 2].max() - img[:, :width // 2].min())
+      cast_img = cast_img * 255
 
       # Keeping only the relevant parts of the histogram
       hist, _ = da.histogram(cast_img, range(256))
