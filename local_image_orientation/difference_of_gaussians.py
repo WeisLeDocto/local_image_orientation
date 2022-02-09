@@ -116,9 +116,9 @@ class DoG_interface(QMainWindow):
     self._set_layout()
     self._set_connections()
     self.move(int((QDesktopWidget().availableGeometry().width() -
-                   self.frameGeometry().width()) / 2),
-              self.frameGeometry().top())
+                   self.frameGeometry().width()) / 2), 0)
     self.show()
+    self.setFixedSize(self.size())
 
   def _set_layout(self) -> None:
     """Sets the graphical interface layout."""
@@ -147,7 +147,7 @@ class DoG_interface(QMainWindow):
                      width, height, width, QImage.Format_Grayscale8)
     self._image = QPixmap(q_img)
     self._image = self._image.scaledToHeight(int(
-        QDesktopWidget().availableGeometry().height() - 250))
+        QDesktopWidget().availableGeometry().height() * 0.75))
     self._label.setPixmap(self._image)
     self._label.setStyleSheet("border: 1px solid black;")
     self._general_layout.addWidget(self._label)
@@ -309,7 +309,7 @@ class DoG_interface(QMainWindow):
     self._image = QPixmap(q_img)
     # Rescaling the image to keep a constant window size
     self._image = self._image.scaledToHeight(int(
-        QDesktopWidget().availableGeometry().height() - 250))
+        QDesktopWidget().availableGeometry().height() * 0.75))
     self._label.setPixmap(self._image)
 
   def _this_slice_management(self) -> None:
