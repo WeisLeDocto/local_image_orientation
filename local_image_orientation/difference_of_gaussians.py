@@ -295,7 +295,8 @@ class DoG_interface(QMainWindow):
       # Displaying half the filtered half the original image
       if self._original_checkbox.isChecked():
         q_img = QImage(
-          concatenate((self._img_filtered[:, :width // 2, self._slider.value()],
+          concatenate((self._img_filtered[:, :width // 2,
+                       self._slider.value()],
                        cast_img[:, :, self._slider.value()]),
                       axis=1).astype(uint8),
           2 * (width // 2), height, 2 * (width // 2), QImage.Format_Grayscale8)
@@ -313,7 +314,8 @@ class DoG_interface(QMainWindow):
     self._label.setPixmap(self._image)
 
   def _this_slice_management(self) -> None:
-    """Computes the DoG on the selected slice and changes different settings."""
+    """Computes the DoG on the selected slice and changes different settings.
+    """
 
     if self._this_slice.isChecked():
       self._dimension = 2
@@ -395,7 +397,7 @@ class DoG_interface(QMainWindow):
       height, width = img.shape[0], img.shape[1]
       cast_img = (img[:, :width // 2] - img[:, :width // 2].min()) \
           / (img[:, :width // 2].max() - img[:, :width // 2].min())
-      cast_img = cast_img * 255
+      cast_img *= 255
 
       # Keeping only the relevant parts of the histogram
       hist, _ = da.histogram(cast_img, range(256))
@@ -449,8 +451,8 @@ class DoG_interface(QMainWindow):
 
     # Generating a default name for the file
     path = Path(self._file).parent / (Path(self._file).name.replace('.npy', '')
-                                      + '_' + "{:.2f}".format(
-        self._slider_1.value() / 100 * self._max_sigma) + '_' + "{:.2f}".format(
+                                      + "_{:.2f}".format(
+        self._slider_1.value() / 100 * self._max_sigma) + "_{:.2f}".format(
         self._slider_2.value() / 100 * self._max_sigma) + '.npy')
     # Choosing the path to write the image to
     file = QFileDialog.getSaveFileName(caption="Create a file to save the "
@@ -482,6 +484,7 @@ class DoG_interface(QMainWindow):
                   'to the desired location.'.format(Path(file).name)).exec()
 
   def _pass(self, *_, **__) -> None:
-    """Does nothing, but used with partial otherwise the window doesn't show."""
+    """Does nothing, but used with partial otherwise the window doesn't show.
+    """
 
     pass

@@ -46,7 +46,7 @@ def plot_histogram(histogram: ndarray,
 
   plt.figure()
   plt.imshow(histogram, cmap='hot', interpolation='nearest',
-             extent=[-90, 90, 90, -90])
+             extent=(-90, 90, 90, -90))
   plt.xticks([-90, -45, 0, 45, 90])
   plt.yticks([-90, -45, 0, 45, 90])
   plt.colorbar()
@@ -66,18 +66,18 @@ def orientation(img_path: str | Path | list,
   histogram.
 
   Args:
-    img_path: The path(s) of the image(s) to compute, as a str, pathlib Path, or
-      a list of str and/or Path.
+    img_path: The path(s) of the image(s) to compute, as a str, pathlib Path,
+      or a list of str and/or Path.
     mask_path: The path(s) to the mask(s) to apply to the image(s). One mask
       must be provided for each image. If left to None, no mask is applied.
     method: Three methods are currently implemented : the 'gradient' one that
-      calculates only the main orientation from the gradient, the 'fast ST' that
-      calculates the three eigen orientations from the structure tensor using an
-      explicit method, and 'exact ST' that calculates the same three
+      calculates only the main orientation from the gradient, the 'fast ST'
+      that calculates the three eigen orientations from the structure tensor
+      using an explicit method, and 'exact ST' that calculates the same three
       orientations from the structure tensor but using the recursive method of
       numpy.linalg.eigh.
     memory_limit: The memory limit dask will try not to exceed.
-    save_folder: The path(s) the the folder(s) where the histogram(s) should be
+    save_folder: The path(s) the folder(s) where the histogram(s) should be
       saved. One folder must be provided for each image. If left to None, the
       histograms are not saved.
   """
@@ -263,7 +263,8 @@ def orientation(img_path: str | Path | list,
                                    dir_max_y ** 2) +
                            dir_max_z * 1.0j, deg=True)
         phi_max = phi_max[10:-10, 10:-10, 10:-10]
-        flat_phi_max = phi_max[~mask] if mask is not None else phi_max.flatten()
+        flat_phi_max = (phi_max[~mask] if mask is not None
+                        else phi_max.flatten())
         theta_int = ((da.angle(dir_int_x +
                                dir_int_y * 1.0j,
                                deg=True) - 90) % 180) - 90
@@ -274,7 +275,8 @@ def orientation(img_path: str | Path | list,
                                    dir_int_y ** 2) +
                            dir_int_z * 1.0j, deg=True)
         phi_int = phi_int[10:-10, 10:-10, 10:-10]
-        flat_phi_int = phi_int[~mask] if mask is not None else phi_int.flatten()
+        flat_phi_int = (phi_int[~mask] if mask is not None
+                        else phi_int.flatten())
         theta_min = ((da.angle(dir_min_x +
                                dir_min_y * 1.0j,
                                deg=True) - 90) % 180) - 90
@@ -285,7 +287,8 @@ def orientation(img_path: str | Path | list,
                                    dir_min_y ** 2) +
                            dir_min_z * 1.0j, deg=True)
         phi_min = phi_min[10:-10, 10:-10, 10:-10]
-        flat_phi_min = phi_min[~mask] if mask is not None else phi_min.flatten()
+        flat_phi_min = (phi_min[~mask] if mask is not None
+                        else phi_min.flatten())
 
         # Generating the histograms
         hist_max, _, _ = da.histogram2d(flat_theta_max, flat_phi_max, 180,
@@ -345,8 +348,8 @@ def orientation(img_path: str | Path | list,
         theta = theta[10:-10, 10:-10, 10:-10]
         flat_theta = theta[~mask] if mask is not None else theta.flatten()
 
-        phi = da.angle(da.sqrt(med_d_dx ** 2 + med_d_dy ** 2) + med_d_dz * 1.0j,
-                       deg=True)
+        phi = da.angle(
+          da.sqrt(med_d_dx ** 2 + med_d_dy ** 2) + med_d_dz * 1.0j, deg=True)
         phi = phi[10:-10, 10:-10, 10:-10]
         flat_phi = phi[~mask] if mask is not None else phi.flatten()
 
