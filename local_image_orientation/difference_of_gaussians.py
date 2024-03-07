@@ -67,7 +67,7 @@ class DoG_interface(QMainWindow):
   image with various sigma values."""
 
   def __init__(self,
-               max_sigma: float = 5) -> None:
+               max_sigma: float = 60) -> None:
     """Loads the image, sets the interface and computes a first DoG.
 
     Args:
