@@ -11,11 +11,24 @@ from skimage.filters import gabor_kernel
 import numpy as np
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 matplotlib.use("TkAgg")
+parallel = True
 
-from itertools import product
-from skimage.feature import structure_tensor
-from scipy.ndimage import sobel
-from pathlib import Path
+
+def convolve_gabor(args):
+  n_pix, ang, image = args
+  kernel = gabor_kernel(frequency=1 / n_pix,
+                        theta=np.pi / 2 - ang,
+                        n_stds=3,
+                        offset=0,
+                        bandwidth=1,
+                        dtype=np.complex64,
+                        sigma_x=4,
+                        sigma_y=7.5)
+  conv = convolve2d(image,
+                    kernel,
+                    mode='same',
+                    boundary='symm').astype(np.complex64)
+  return np.sqrt(conv.real ** 2 + conv.imag ** 2)
 
 
 def plot_histogram(histogram: np.ndarray,
@@ -63,21 +76,37 @@ if __name__ == '__main__':
   nb_ang = 45
   res = np.zeros(shape=(*img.shape, nb_ang), dtype='float64')
 
-  for i, angle in enumerate(np.linspace(0, np.pi, nb_ang)):
-    gab_kernel = gabor_kernel(frequency=1 / nb_pix, n_stds=3, offset=0,
-                              theta=angle, bandwidth=1,
-                              dtype=np.complex64, sigma_x=4, sigma_y=7.5)
-    filtered = convolve2d(img, gab_kernel,
-                          mode='same', boundary='symm').astype(
-      np.complex64)
-    gab = np.sqrt(filtered.real ** 2 + filtered.imag ** 2)
-    res[:, :, i] = gab
-    print(f"{i + 1} / {nb_ang}")
+  if parallel:
+    print()
+    pool_iterables = zip(repeat(nb_pix),
+                         np.linspace(0, np.pi, nb_ang),
+                         repeat(img))
+    with ProcessPoolExecutor(max_workers=8) as executor:
+      for i, gab in tqdm(enumerate(executor.map(convolve_gabor,
+                                                pool_iterables)),
+                         total=nb_ang,
+                         desc='Gabor kernel convolution',
+                         file=sys.stdout,
+                         colour='green'):
+        res[:, :, i] = gab
 
-  if False:
-    for i, _ in enumerate(np.linspace(0, np.pi, nb_ang)):
-      res[:, :, i] = convolve2d(res[:, :, i], np.ones((5, 5)) / 25,
-                                mode='same', boundary='symm')
+  else:
+    print()
+    for i, angle in tqdm(enumerate(np.linspace(0, np.pi, nb_ang)),
+                         total=nb_ang,
+                         desc='Gabor kernel convolution',
+                         file=sys.stdout,
+                         colour='green'):
+      angle: float
+      i: int
+      gab_kernel = gabor_kernel(frequency=1 / nb_pix, n_stds=3, offset=0,
+                                theta=np.pi / 2 - angle, bandwidth=1,
+                                dtype=np.complex64, sigma_x=4, sigma_y=7.5)
+      filtered = convolve2d(img, gab_kernel,
+                            mode='same', boundary='symm').astype(
+        np.complex64)
+      gab = np.sqrt(filtered.real ** 2 + filtered.imag ** 2)
+      res[:, :, i] = gab
 
   plt.figure()
   plt.plot(np.linspace(0, 180, nb_ang), res[367, 250])
@@ -124,16 +153,35 @@ if __name__ == '__main__':
   nb_ang = 45
   res = np.zeros(shape=(*intensity.shape, nb_ang), dtype='float64')
 
-  for i, angle in enumerate(np.linspace(0, np.pi, nb_ang)):
-    gab_kernel = gabor_kernel(frequency=1 / nb_pix, n_stds=3, offset=0,
-                              theta=angle, bandwidth=1,
-                              dtype=np.complex64, sigma_x=4, sigma_y=7.5)
-    filtered = convolve2d(intensity, gab_kernel,
-                          mode='same', boundary='symm').astype(
-      np.complex64)
-    gab = np.sqrt(filtered.real ** 2 + filtered.imag ** 2)
-    res[:, :, i] = gab
-    print(f"{i + 1} / {nb_ang}")
+  if parallel:
+    print()
+    pool_iterables = zip(repeat(nb_pix),
+                         np.linspace(0, np.pi, nb_ang),
+                         repeat(intensity))
+    with ProcessPoolExecutor(max_workers=8) as executor:
+      for i, gab in tqdm(enumerate(executor.map(convolve_gabor,
+                                                pool_iterables)),
+                         total=nb_ang,
+                         desc='Gabor kernel convolution',
+                         file=sys.stdout,
+                         colour='green'):
+        res[:, :, i] = gab
+
+  else:
+    print()
+    for i, angle in tqdm(enumerate(np.linspace(0, np.pi, nb_ang)),
+                         total=nb_ang,
+                         desc='Gabor kernel convolution',
+                         file=sys.stdout,
+                         colour='green'):
+      gab_kernel = gabor_kernel(frequency=1 / nb_pix, n_stds=3, offset=0,
+                                theta=np.pi / 2 - angle, bandwidth=1,
+                                dtype=np.complex64, sigma_x=4, sigma_y=7.5)
+      filtered = convolve2d(intensity, gab_kernel,
+                            mode='same', boundary='symm').astype(
+        np.complex64)
+      gab = np.sqrt(filtered.real ** 2 + filtered.imag ** 2)
+      res[:, :, i] = gab
 
   np.save('./result.npy', res)
 
