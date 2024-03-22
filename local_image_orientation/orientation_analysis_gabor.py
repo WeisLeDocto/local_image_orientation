@@ -135,8 +135,22 @@ if __name__ == '__main__':
     res[:, :, i] = gab
     print(f"{i + 1} / {nb_ang}")
 
-  plt.figure()
-  plt.plot(np.linspace(0, 180, nb_ang), res[367, 250])
+  np.save('./result.npy', res)
+
+  section_y = 350
+  ax = plt.figure().add_subplot(1, 1, 1, projection='3d')
+  x = np.linspace(0, 180, nb_ang)
+  y = np.arange(0, res.shape[1], 20)
+  polys = [[(np.min(x), np.min(res[section_y])),
+            *zip(x, res[section_y, loc]),
+            (np.max(x), np.min(res[section_y]))]
+           for loc in y]
+  colors = plt.colormaps['gist_rainbow'](np.linspace(0, 1, len(polys)))
+  poly = PolyCollection(polys, edgecolor='black', facecolors=colors, alpha=.4)
+  ax.add_collection3d(poly, zs=y, zdir='y')
+  ax.set_xlim([np.min(x), np.max(x)])
+  ax.set_ylim([np.min(y), np.max(y)])
+  ax.set_zlim([np.min(res[section_y]), np.max(res[section_y])])
   plt.show(block=False)
 
   dirr = np.linspace(0, 180, nb_ang)[np.argmax(res, axis=2)]
@@ -152,10 +166,17 @@ if __name__ == '__main__':
   plt.imshow(dirr, cmap='twilight')
   ax = plt.subplot(2, 2, 2, projection='3d')
   x = np.linspace(0, 180, nb_ang)
-  y = np.arange(res.shape[1])
-  x, y = np.meshgrid(x, y)
-  z = res[section_y]
-  ax.plot_surface(x, y, z, cmap='plasma')
+  y = np.arange(0, res.shape[1], 20)
+  polys = [[(np.min(x), np.min(res[section_y])),
+            *zip(x, res[section_y, loc]),
+            (np.max(x), np.min(res[section_y]))]
+           for loc in y]
+  colors = plt.colormaps['gist_rainbow'](np.linspace(0, 1, len(polys)))
+  poly = PolyCollection(polys, edgecolor='black', facecolors=colors, alpha=.4)
+  ax.add_collection3d(poly, zs=y, zdir='y')
+  ax.set_xlim([np.min(x), np.max(x)])
+  ax.set_ylim([np.min(y), np.max(y)])
+  ax.set_zlim([np.min(res[section_y]), np.max(res[section_y])])
   plt.subplot(2, 2, 4)
   plt.hlines(section_y, 0, intensity.shape[1], colors='k')
   plt.imshow(intensity, cmap='plasma',
