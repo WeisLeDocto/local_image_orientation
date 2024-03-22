@@ -50,11 +50,14 @@ def plot_histogram(histogram: np.ndarray,
 
 if __name__ == '__main__':
 
-  img = cv2.imread('/home/weis/Downloads/Transmission/2/capture_5-'
-                   'capture_320-Weights= Triangular - Response curve= '
-                   'Linear - Model= Debevec.exr',
-                   cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
-  img = img[750: 1600, 1750: 2750, 1]
+  if True:
+    img = cv2.imread('/home/weis/Downloads/Transmission/2/capture_5-'
+                     'capture_320-Weights= Triangular - Response curve= '
+                     'Linear - Model= Debevec.exr',
+                     cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
+    img = img[750: 1600, 1750: 2750, 1]
+  else:
+    img = np.load('./../artificial/small_wave.npy')
 
   img = gaussian_filter(img, sigma=2, order=0,
                         mode='nearest', truncate=4.0, axes=None)
