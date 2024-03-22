@@ -5,3 +5,5 @@ scikit-image>=0.17.2
 SimpleITK>=2.1.0
 dask[distributed]>=2021.9.1
 PyQt5>=5.15.4
+tqdm
+opencv-python
