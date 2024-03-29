@@ -78,7 +78,7 @@ def curve_fit_wrapper(args):
                       bounds=bounds)[0]
 
 
-def fit_curve(maxima, gabor, ang_steps, parallel: bool = False):
+def fit_curve(maxima, gabor, ang_steps):
 
   low_bound = (0, 0, 0)
   up_bound = (np.inf, np.inf, np.inf)
@@ -93,47 +93,26 @@ def fit_curve(maxima, gabor, ang_steps, parallel: bool = False):
   fit_meth[n_peak == 2] = periodic_gaussian_2
   fit_meth[n_peak == 3] = periodic_gaussian_3
 
-  if not parallel:
-    for i, (x, y) in tqdm(enumerate(product(*map(range, gabor.shape[:2]))),
-                          total=prod(gabor.shape[:2]),
-                          desc='Gaussian interpolation',
-                          file=sys.stdout,
-                          colour='green'):
+  pool_iterables = enumerate(zip(
+    fit_meth.flatten(),
+    maxima.reshape(-1, *maxima.shape[2:]) * np.pi / 180,
+    repeat(ang_steps * np.pi / 180),
+    gabor.reshape(-1, *gabor.shape[2:]),
+    repeat(50000),
+    (n_peak[x, y] * guess for x, y in
+     product(*map(range, gabor.shape[:2]))),
+    ((n_peak[x, y] * low_bound, n_peak[x, y] * up_bound)
+     for x, y in product(*map(range, gabor.shape[:2])))))
 
-      try:
-        ret[x, y, :4 * n_peak[x, y]], *_ = curve_fit(
-          fit_meth[x, y],
-          ang_steps * np.pi / 180,
-          gabor[x, y],
-          maxfev=50000,
-          p0=n_peak[x, y] * guess,
-          bounds=(n_peak[x, y] * low_bound,
-                  n_peak[x, y] * up_bound))
-
-      except RuntimeError:
-        pass
-
-  else:
-    pool_iterables = enumerate(zip(
-      fit_meth.flatten(),
-      maxima.reshape(-1, *maxima.shape[2:]) * np.pi / 180,
-      repeat(ang_steps * np.pi / 180),
-      gabor.reshape(-1, *gabor.shape[2:]),
-      repeat(50000),
-      (n_peak[x, y] * guess for x, y in
-       product(*map(range, gabor.shape[:2]))),
-      ((n_peak[x, y] * low_bound, n_peak[x, y] * up_bound)
-       for x, y in product(*map(range, gabor.shape[:2])))))
-
-    with ProcessPoolExecutor(max_workers=8) as executor:
-      for i, vals in tqdm(executor.map(curve_fit_wrapper, pool_iterables),
-                          total=prod(gabor.shape[:2]),
-                          desc='Gaussian interpolation',
-                          file=sys.stdout,
-                          colour='green'):
-        # vals = list(chain(*sorted(batched(vals, 3), key=sort_key,
-        #                           reverse=True)))
-        ret[*np.unravel_index(i, gabor.shape[:2]), :len(vals)] = vals
+  with ProcessPoolExecutor(max_workers=8) as executor:
+    for i, vals in tqdm(executor.map(curve_fit_wrapper, pool_iterables),
+                        total=prod(gabor.shape[:2]),
+                        desc='Gaussian interpolation',
+                        file=sys.stdout,
+                        colour='green'):
+      # vals = list(chain(*sorted(batched(vals, 3), key=sort_key,
+      #                           reverse=True)))
+      ret[*np.unravel_index(i, gabor.shape[:2]), :len(vals)] = vals
 
   return ret
 
@@ -163,7 +142,7 @@ if __name__ == '__main__':
   print()
 
   if False:
-    fit = fit_curve(peaks, res, ang, parallel=True)
+    fit = fit_curve(peaks, res, ang)
     np.save('./gaussian_fit.npy', fit)
   else:
     fit = np.load('./gaussian_fit.npy')
