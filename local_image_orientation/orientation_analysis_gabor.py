@@ -36,40 +36,21 @@ def convolve_gabor(args):
   return np.sqrt(conv.real ** 2 + conv.imag ** 2)
 
 
-def process_gabor(image, n_ang, n_pix, parallelize):
+def process_gabor(image, n_ang, n_pix):
 
   res = np.zeros(shape=(*img.shape, n_ang), dtype='float64')
 
-  if parallelize:
-    print()
-    pool_iterables = zip(repeat(n_pix),
-                         np.linspace(0, np.pi, n_ang),
-                         repeat(image))
-    with ProcessPoolExecutor(max_workers=8) as executor:
-      for i, gab in tqdm(enumerate(executor.map(convolve_gabor,
-                                                pool_iterables)),
-                         total=n_ang,
-                         desc='Gabor kernel convolution',
-                         file=sys.stdout,
-                         colour='green'):
-        res[:, :, i] = gab
-
-  else:
-    print()
-    for i, angle in tqdm(enumerate(np.linspace(0, np.pi, n_ang)),
-                         total=n_ang,
-                         desc='Gabor kernel convolution',
-                         file=sys.stdout,
-                         colour='green'):
-      angle: float
-      i: int
-      gab_kernel = gabor_kernel(frequency=1 / n_pix, n_stds=3, offset=0,
-                                theta=np.pi / 2 - angle, bandwidth=1,
-                                dtype=np.complex64, sigma_x=4, sigma_y=7.5)
-      filtered = convolve2d(image, gab_kernel,
-                            mode='same', boundary='symm').astype(
-        np.complex64)
-      gab = np.sqrt(filtered.real ** 2 + filtered.imag ** 2)
+  print()
+  pool_iterables = zip(repeat(n_pix),
+                       np.linspace(0, np.pi, n_ang),
+                       repeat(image))
+  with ProcessPoolExecutor(max_workers=8) as executor:
+    for i, gab in tqdm(enumerate(executor.map(convolve_gabor,
+                                              pool_iterables)),
+                       total=n_ang,
+                       desc='Gabor kernel convolution',
+                       file=sys.stdout,
+                       colour='green'):
       res[:, :, i] = gab
 
   return res
@@ -109,7 +90,6 @@ def plot_summary(section_y, image, normalized, directions, n_ang, dir_dist):
   plt.show()
 
 
-parallel = True
 nb_pix = 15
 nb_ang = 45
 
@@ -139,7 +119,7 @@ if __name__ == '__main__':
   plt.imshow(gab_kernel.imag)
   plt.show()
 
-  res = process_gabor(img, nb_ang, nb_pix, parallel)
+  res = process_gabor(img, nb_ang, nb_pix)
   dir_ = np.linspace(0, 180, nb_ang)[np.argmax(res, axis=2)]
   intensity = np.max(res, axis=2) / img
 
@@ -153,7 +133,7 @@ if __name__ == '__main__':
   intensity = ((intensity - intensity.min()) /
                (intensity.max() - intensity.min())).astype('float64')
 
-  res = process_gabor(intensity, nb_ang, nb_pix, parallel)
+  res = process_gabor(intensity, nb_ang, nb_pix)
   dir_ = np.linspace(0, 180, nb_ang)[np.argmax(res, axis=2)]
   norm = np.max(res, axis=2) / (intensity + 1)
 
