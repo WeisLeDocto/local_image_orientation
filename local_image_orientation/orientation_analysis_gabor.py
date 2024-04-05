@@ -134,7 +134,6 @@ if __name__ == '__main__':
                (intensity.max() - intensity.min())).astype('float64')
 
   res = process_gabor(intensity, nb_ang, nb_pix)
-  dir_ = np.linspace(0, 180, nb_ang)[np.argmax(res, axis=2)]
   norm = np.max(res, axis=2) / (intensity + 1)
 
   np.save('./result.npy', res)
