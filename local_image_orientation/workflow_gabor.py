@@ -7,7 +7,7 @@ from scipy.ndimage import gaussian_filter
 from scipy.signal import convolve2d
 from skimage.filters import gabor_kernel
 from scipy.optimize import curve_fit
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, peak_widths
 import matplotlib
 from matplotlib import pyplot as plt
 from itertools import product
@@ -101,10 +101,13 @@ def periodic_gaussian_3(x,
           periodic_gaussian(x, sigma_3, mu_3, a_3, b_3))
 
 
-def search_maxima(input_aray):
+def search_maxima(input_aray, angle_step):
   """"""
 
-  ret = np.full((*input_aray.shape[:2], 3), -1, dtype=np.int16)
+  ret_idx = np.full((*input_aray.shape[:2], 3), -1, dtype=np.int16)
+  ret_amp = np.zeros((*input_aray.shape[:2], 3), dtype=np.float32)
+  ret_sigma = np.zeros((*input_aray.shape[:2], 3), dtype=np.float32)
+  ret_offset = np.zeros((*input_aray.shape[:2],), dtype=np.float32)
   for i, (x, y) in tqdm(enumerate(product(*map(range, input_aray.shape[:2]))),
                         total=prod(input_aray.shape[:2]),
                         desc='Peak detection',
@@ -113,15 +116,37 @@ def search_maxima(input_aray):
     min_index = np.argmin(input_aray[x, y])
     to_search = np.append(input_aray[x, y][min_index:],
                           input_aray[x, y][:min_index])
+    min_val = np.min(input_aray[x, y])
+
     peak_index, props = find_peaks(
       to_search,
-      prominence=0.05 * (np.max(input_aray[x, y]) - np.min(input_aray[x, y])))
+      prominence=0.05 * (np.max(input_aray[x, y]) - min_val),
+      width=(None, None), height=(None, None))
+
+    widths, width_heights, *_ = peak_widths(to_search, peak_index,
+                                            rel_height=0.5)
+    widths *= angle_step * np.pi / 180
     peak_index = (peak_index + min_index) % len(res[x, y])
+
     proms = props['prominences']
-    proms, peak_index = zip(*sorted(zip(proms, peak_index), reverse=True))
+    heights = props['peak_heights']
+
+    proms, peak_index, widths, width_heights, heights = zip(*sorted(zip(
+      proms, peak_index, widths, width_heights, heights), reverse=True))
+
     peak_index = peak_index[:3]
-    ret[x, y, :len(peak_index)] = peak_index
-  return ret
+    widths = np.array(widths[:3])
+    width_heights = np.array(width_heights[:3]) - min_val
+    heights = np.array(heights[:3]) - min_val
+
+    deviation = widths / (2 * np.sqrt(np.log(heights / width_heights)))
+
+    ret_idx[x, y, :len(peak_index)] = peak_index
+    ret_amp[x, y, :len(heights)] = heights
+    ret_sigma[x, y, :len(deviation)] = deviation
+    ret_offset[x, y] = min_val
+
+  return ret_idx, ret_amp, ret_sigma, ret_offset
 
 
 def curve_fit_wrapper(args):
