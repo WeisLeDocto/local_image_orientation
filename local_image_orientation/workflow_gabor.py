@@ -283,7 +283,7 @@ if __name__ == '__main__':
 
   plt.figure()
   plt.subplot(2, 2, 1)
-  plt.imshow(img, cmap='plasma')
+  plt.imshow(img[window_x, window_y], cmap='plasma')
   plt.subplot(2, 2, 2)
   plt.imshow(fit[:, :, 0], clim=(np.percentile(fit[:, :, 0], 1),
                                  np.percentile(fit[:, :, 0], 99)),
