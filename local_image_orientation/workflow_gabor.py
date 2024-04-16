@@ -121,7 +121,7 @@ def search_maxima(input_aray, angle_step):
     widths, width_heights, *_ = peak_widths(to_search, peak_index,
                                             rel_height=0.5)
     widths *= angle_step * np.pi / 180
-    peak_index = (peak_index + min_index) % len(res[x, y])
+    peak_index = (peak_index + min_index) % len(input_aray[x, y])
 
     proms = props['prominences']
     heights = props['peak_heights']
