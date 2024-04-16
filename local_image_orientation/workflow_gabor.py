@@ -3,7 +3,6 @@
 from pathlib import Path
 import numpy as np
 from re import search
-from scipy.ndimage import gaussian_filter
 from scipy.signal import convolve2d
 from skimage.filters import gabor_kernel
 from scipy.optimize import curve_fit
@@ -227,9 +226,7 @@ if __name__ == '__main__':
 
   del images
 
-  img = gaussian_filter(hdr, sigma=2, order=0,
-                        mode='nearest', truncate=4.0, axes=None)
-  img = ((img - img.min()) / (img.max() - img.min())).astype('float64')
+  img = ((hdr - hdr.min()) / (hdr.max() - hdr.min())).astype('float64')
 
   del hdr
 
