@@ -81,24 +81,20 @@ def periodic_gaussian(x, sigma, a, b, mu):
     - (((x + np.pi / 2 - mu) % np.pi - np.pi / 2) / sigma) ** 2)
 
 
-def periodic_gaussian_2(x,
-                        sigma_1, a_1, b_1,
-                        sigma_2, a_2, b_2, mu_1, mu_2):
+def periodic_gaussian_2(x, sigma_1, a_1, sigma_2, a_2, b, mu_1, mu_2):
   """"""
 
-  return (periodic_gaussian(x, sigma_1, mu_1, a_1, b_1) +
-          periodic_gaussian(x, sigma_2, mu_2, a_2, b_2))
+  return (periodic_gaussian(x, sigma_1, a_1, 0, mu_1) +
+          periodic_gaussian(x, sigma_2, a_2, b, mu_2))
 
 
-def periodic_gaussian_3(x,
-                        sigma_1, a_1, b_1,
-                        sigma_2, a_2, b_2,
-                        sigma_3, a_3, b_3, mu_1, mu_2, mu_3):
+def periodic_gaussian_3(x, sigma_1, a_1, sigma_2, a_2, sigma_3, a_3,
+                        b, mu_1, mu_2, mu_3):
   """"""
 
-  return (periodic_gaussian(x, sigma_1, mu_1, a_1, b_1) +
-          periodic_gaussian(x, sigma_2, mu_2, a_2, b_2) +
-          periodic_gaussian(x, sigma_3, mu_3, a_3, b_3))
+  return (periodic_gaussian(x, sigma_1, a_1, 0, mu_1) +
+          periodic_gaussian(x, sigma_2, a_2, 0, mu_2) +
+          periodic_gaussian(x, sigma_3, a_3, b, mu_3))
 
 
 def search_maxima(input_aray, angle_step):
@@ -154,6 +150,9 @@ def curve_fit_wrapper(args):
 
   i, (meth, maxima, x_data, y_data, max_fev, p0, bounds) = args
   n_peaks = np.count_nonzero(np.invert(np.isnan(maxima)))
+  p0 = np.append(p0[:2 * n_peaks], p0[-1])
+  bounds = np.append(bounds[:, :2 * n_peaks], bounds[:, -1][:, np.newaxis],
+                     axis=1)
   if n_peaks == 1:
     meth = partial(meth, mu=maxima[0])
   elif n_peaks == 2:
@@ -168,15 +167,21 @@ def curve_fit_wrapper(args):
                       bounds=bounds)[0]
 
 
-def fit_curve(maxima, gabor, ang_steps):
+def fit_curve(maxima, gabor, ang_steps, guess_amp, guess_sigma, guess_offset):
   """"""
 
-  low_bound = (0, 0, 0)
-  up_bound = (np.inf, np.inf, np.inf)
-  guess = (0.5, 0.5, 0)
+  ret = np.zeros((*gabor.shape[:2], 7))
+  ret[:, :, 0] = np.inf
+  ret[:, :, 2] = np.inf
+  ret[:, :, 4] = np.inf
 
-  ret = np.zeros((*gabor.shape[:2], 9))
-  ret[:, :, ::3] = np.inf
+  guess = np.zeros_like(ret)
+  guess[:, :, 0:6:2] = guess_sigma
+  guess[:, :, 1:6:2] = guess_amp
+  guess[:, :, -1] = guess_offset
+
+  bounds = np.zeros((*gabor.shape[:2], 2, 7))
+  bounds[:, :, 1] = np.inf
 
   n_peak = np.count_nonzero(np.invert(np.isnan(maxima)), axis=2)
   fit_meth = np.empty_like(n_peak, dtype='O')
@@ -186,14 +191,12 @@ def fit_curve(maxima, gabor, ang_steps):
 
   pool_iterables = enumerate(zip(
     fit_meth.flatten(),
-    maxima.reshape(-1, *maxima.shape[2:]) * np.pi / 180,
-    repeat(ang_steps * np.pi / 180),
+    maxima.reshape(-1, *maxima.shape[2:]),
+    repeat(ang_steps),
     gabor.reshape(-1, *gabor.shape[2:]),
     repeat(50000),
-    (n_peak[x, y] * guess for x, y in
-     product(*map(range, gabor.shape[:2]))),
-    ((n_peak[x, y] * low_bound, n_peak[x, y] * up_bound)
-     for x, y in product(*map(range, gabor.shape[:2])))))
+    guess.reshape(-1, *guess.shape[2:]),
+    bounds.reshape(-1, *bounds.shape[2:])))
 
   with ProcessPoolExecutor(max_workers=8) as executor:
     for i, vals in tqdm(executor.map(curve_fit_wrapper, pool_iterables),
@@ -201,9 +204,8 @@ def fit_curve(maxima, gabor, ang_steps):
                         desc='Gaussian interpolation',
                         file=sys.stdout,
                         colour='green'):
-      # vals = list(chain(*sorted(batched(vals, 3), key=sort_key,
-      #                           reverse=True)))
-      ret[*np.unravel_index(i, gabor.shape[:2]), :len(vals)] = vals
+      ret[*np.unravel_index(i, gabor.shape[:2]), :len(vals) - 1] = vals[:-1]
+      ret[*np.unravel_index(i, gabor.shape[:2]), -1] = vals[-1]
 
   return ret
 
@@ -248,7 +250,7 @@ if __name__ == '__main__':
 
   res = res[window_x, window_y]
   ang = np.linspace(0, 180, nb_ang)
-  peak_idx = search_maxima(res)
+  peak_idx, amp, sigma, offset = search_maxima(res, ang[1] - ang[0])
   peaks = ang[peak_idx]
   peaks[peak_idx == -1] = np.nan
 
@@ -260,7 +262,8 @@ if __name__ == '__main__':
     print(f"{i} peaks: {n} pixels")
   print()
 
-  fit = fit_curve(peaks, res, ang)
+  fit = fit_curve(peaks * np.pi / 180, res, ang * np.pi / 180, amp, sigma,
+                  offset)
 
   plt.figure()
   plt.subplot(1, 3, 1)
@@ -318,7 +321,7 @@ if __name__ == '__main__':
                                  np.percentile(fit[:, :, 1], 99)),
              cmap='plasma')
   plt.subplot(2, 2, 4)
-  plt.imshow(fit[:, :, 2], clim=(np.percentile(fit[:, :, 2], 1),
-                                 np.percentile(fit[:, :, 2], 99)),
+  plt.imshow(fit[:, :, -1], clim=(np.percentile(fit[:, :, -1], 1),
+                                  np.percentile(fit[:, :, -1], 99)),
              cmap='plasma')
   plt.show()
