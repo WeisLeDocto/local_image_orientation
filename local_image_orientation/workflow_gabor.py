@@ -163,13 +163,15 @@ def curve_fit_wrapper(args):
                       y_data,
                       maxfev=max_fev,
                       p0=p0,
-                      bounds=bounds)[0]
+                      bounds=bounds,
+                      full_output=True)
 
 
 def fit_curve(maxima, gabor, ang_steps, guess_amp, guess_sigma, guess_offset):
   """"""
 
   ret = np.zeros((*gabor.shape[:2], 7))
+  residuals = np.zeros(gabor.shape[:2])
   ret[:, :, 0] = np.inf
   ret[:, :, 2] = np.inf
   ret[:, :, 4] = np.inf
@@ -198,15 +200,18 @@ def fit_curve(maxima, gabor, ang_steps, guess_amp, guess_sigma, guess_offset):
     bounds.reshape(-1, *bounds.shape[2:])))
 
   with ProcessPoolExecutor(max_workers=8) as executor:
-    for i, vals in tqdm(executor.map(curve_fit_wrapper, pool_iterables),
-                        total=prod(gabor.shape[:2]),
-                        desc='Gaussian interpolation',
-                        file=sys.stdout,
-                        colour='green'):
+    for i, (vals, _, info_dict, *_) in tqdm(executor.map(curve_fit_wrapper,
+                                                         pool_iterables),
+                                            total=prod(gabor.shape[:2]),
+                                            desc='Gaussian interpolation',
+                                            file=sys.stdout,
+                                            colour='green'):
       ret[*np.unravel_index(i, gabor.shape[:2]), :len(vals) - 1] = vals[:-1]
       ret[*np.unravel_index(i, gabor.shape[:2]), -1] = vals[-1]
+      residuals[*np.unravel_index(i, gabor.shape[:2])] = np.sum(
+        info_dict['fvec']**2)
 
-  return ret
+  return ret, residuals
 
 
 if __name__ == '__main__':
@@ -259,8 +264,12 @@ if __name__ == '__main__':
     print(f"{i} peaks: {n} pixels")
   print()
 
-  fit = fit_curve(peaks * np.pi / 180, res, ang * np.pi / 180, amp, sigma,
-                  offset)
+  fit, residual = fit_curve(peaks * np.pi / 180, res, ang * np.pi / 180, amp,
+                            sigma, offset)
+
+  plt.figure()
+  plt.imshow(residual)
+  plt.show(block=False)
 
   plt.figure()
   plt.subplot(1, 3, 1)
