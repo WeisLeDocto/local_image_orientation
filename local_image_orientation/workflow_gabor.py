@@ -21,6 +21,7 @@ import numba as nb
 import cupyx.scipy.signal as gpu_signal
 import cupy as cp
 import cucim.skimage.filters as gpu_filters
+from time import time
 
 matplotlib.use('TkAgg')
 
@@ -445,12 +446,14 @@ if __name__ == '__main__':
   exposure_time = (1 / int(search(r'\d+', image.name)[0])
                    for image in images_names)
 
+  print('\nCreating HDR image')
+  t = time()
   hdr = cv2.createMergeMertens(
     contrast_weight=0,
     saturation_weight=1,
     exposure_weight=1).process(tuple(images), tuple(exposure_time))
   hdr = hdr[roi_x, roi_y, color]
-  hdr = (hdr - hdr.min()) / (hdr.max() - hdr.min())
+  print(f'Created HDR image, took {time() - t:.2f}s\n')
 
   del images
 
@@ -458,6 +461,8 @@ if __name__ == '__main__':
 
   del hdr
 
+  print('\nApplying Gabor filter')
+  t = time()
   res = process_gabor(img, nb_ang, nb_pix)
   intensity = np.max(res, axis=2) / img
 
@@ -470,6 +475,7 @@ if __name__ == '__main__':
                (intensity.max() - intensity.min())).astype('float64')
 
   res = process_gabor(intensity, nb_ang, nb_pix)
+  print(f'Applied Gabor filter, took {time() - t:.2f}s\n')
 
   del intensity
 
