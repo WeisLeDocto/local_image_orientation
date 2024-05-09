@@ -17,6 +17,7 @@ from itertools import repeat
 from tqdm import tqdm
 import sys
 import cv2
+import numba as nb
 import cupyx.scipy.signal as gpu_signal
 import cupy as cp
 import cucim.skimage.filters as gpu_filters
@@ -126,6 +127,80 @@ def periodic_gaussian_3(x, sigma_1, a_1, sigma_2, a_2, sigma_3, a_3,
   return (periodic_gaussian(x, sigma_1, a_1, 0, mu_1) +
           periodic_gaussian(x, sigma_2, a_2, 0, mu_2) +
           periodic_gaussian(x, sigma_3, a_3, b, mu_3))
+
+
+@nb.jit(nb.types.float64[:](
+  nb.types.float64[:], nb.types.float64, nb.types.float64, nb.types.float64,
+  nb.types.float64, nb.types.float64, nb.types.float64, nb.types.float64,
+  nb.types.float64, nb.types.float64, nb.types.float64, nb.types.int64),
+  nopython=True, nogil=True)
+def periodic_gaussian_jit(x, sigma_1, a_1, sigma_2, a_2, sigma_3, a_3,
+                          b, mu_1, mu_2, mu_3, n):
+  """"""
+
+  if n == 1:
+    return (b + a_1 * np.exp(-(((x + np.pi / 2 - mu_1) % np.pi - np.pi / 2)
+                               / sigma_1) ** 2))
+  elif n == 2:
+    return (b + a_1 * np.exp(-(((x + np.pi / 2 - mu_1) % np.pi - np.pi / 2)
+                               / sigma_1) ** 2) +
+            a_2 * np.exp(-(((x + np.pi / 2 - mu_2) % np.pi - np.pi / 2)
+                           / sigma_2) ** 2))
+  else:
+    return (b + a_1 * np.exp(-(((x + np.pi / 2 - mu_1) % np.pi - np.pi / 2)
+                               / sigma_1) ** 2) +
+            a_2 * np.exp(-(((x + np.pi / 2 - mu_2) % np.pi - np.pi / 2)
+                           / sigma_2) ** 2) +
+            a_3 * np.exp(-(((x + np.pi / 2 - mu_3) % np.pi - np.pi / 2)
+                           / sigma_3) ** 2))
+
+
+@nb.jit(nb.types.float64[:](
+  nb.types.float64[:], nb.types.float64[:], nb.types.float64, nb.types.float64,
+  nb.types.float64, nb.types.float64, nb.types.float64, nb.types.float64,
+  nb.types.float64, nb.types.float64, nb.types.float64, nb.types.float64,
+  nb.types.int64), nopython=True, nogil=True)
+def periodic_gaussian_derivative(x, y, sigma_1, a_1, sigma_2, a_2, sigma_3,
+                                 a_3, b, mu_1, mu_2, mu_3, n):
+  """"""
+
+  diff = y - periodic_gaussian_jit(x, sigma_1, a_1, sigma_2, a_2, sigma_3,
+                                   a_3, b, mu_1, mu_2, mu_3, n)
+  exp_1 = np.exp(-((x - mu_1) / sigma_1) ** 2)
+
+  if n == 1:
+    return np.array((-4 * a_1 * np.sum(diff * exp_1 * (x - mu_1) ** 2 /
+                                       (sigma_1 ** 3)),
+                     -2 * np.sum(diff * exp_1),
+                     0,
+                     0,
+                     0,
+                     0,
+                     -2 * np.sum(diff)))
+  elif n == 2:
+    exp_2 = np.exp(-((x - mu_2) / sigma_2) ** 2)
+    return np.array((-4 * a_1 * np.sum(diff * exp_1 *
+                                       (x - mu_1) ** 2 / (sigma_1 ** 3)),
+                     -2 * np.sum(diff * exp_1),
+                     -4 * a_2 * np.sum(diff * exp_2 *
+                                       (x - mu_2) ** 2 / (sigma_2 ** 3)),
+                     -2 * np.sum(diff * exp_2),
+                     0,
+                     0,
+                     -2 * np.sum(diff)))
+  else:
+    exp_2 = np.exp(-((x - mu_2) / sigma_2) ** 2)
+    exp_3 = np.exp(-((x - mu_3) / sigma_3) ** 2)
+    return np.array((-4 * a_1 * np.sum(diff * exp_1 *
+                                       (x - mu_1) ** 2 / (sigma_1 ** 3)),
+                     -2 * np.sum(diff * exp_1),
+                     -4 * a_2 * np.sum(diff * exp_2 *
+                                       (x - mu_2) ** 2 / (sigma_2 ** 3)),
+                     -2 * np.sum(diff * exp_2),
+                     -4 * a_3 * np.sum(diff * exp_3 *
+                                       (x - mu_3) ** 2 / (sigma_3 ** 3)),
+                     -2 * np.sum(diff * exp_3),
+                     -2 * np.sum(diff)))
 
 
 def search_maxima(input_aray, angle_step):
@@ -242,6 +317,122 @@ def fit_curve(maxima, gabor, ang_steps, guess_amp, guess_sigma, guess_offset):
       ret[*np.unravel_index(i, gabor.shape[:2]), -1] = vals[-1]
       residuals[*np.unravel_index(i, gabor.shape[:2])] = np.sum(
         info_dict['fvec']**2)
+
+  return ret, residuals
+
+
+@nb.jit(nb.types.Tuple((nb.float64[:], nb.float64))(
+  nb.types.int64, nb.types.float64[:], nb.types.float64[:],
+  nb.types.float64[:], nb.types.float64[:], nb.types.float64, nb.types.int64),
+  nopython=True)
+def optimized(n_peak, x_data, y_data, params, mu, thresh, max_iter):
+  """"""
+
+  weight = 0.001
+  residuals = np.sum((y_data -
+                      periodic_gaussian_jit(x_data, params[0], params[1],
+                                            params[2], params[3], params[4],
+                                            params[5], params[6],
+                                            mu[0], mu[1], mu[2], n_peak)) ** 2)
+  params -= weight * periodic_gaussian_derivative(
+    x_data, y_data, params[0], params[1], params[2], params[3], params[4],
+    params[5], params[6], mu[0], mu[1], mu[2], n_peak)
+  new_residuals = np.sum((y_data -
+                          periodic_gaussian_jit(
+                            x_data, params[0], params[1], params[2], params[3],
+                            params[4], params[5], params[6], mu[0], mu[1],
+                            mu[2], n_peak)) ** 2)
+
+  params0 = params.copy()
+
+  n = 0
+  while True:
+    if ((new_residuals < residuals and residuals - new_residuals < thresh)
+        or n > max_iter):
+      break
+    n += 1
+
+    if (np.any(np.isnan(params)) or np.any(np.isinf(params)) or
+        np.isnan(new_residuals) or np.isinf(new_residuals)):
+      weight = 0.001
+      n = 0
+      params = params0.copy()
+      new_residuals = np.sum((y_data - periodic_gaussian_jit(
+                                x_data, params[0], params[1], params[2],
+                                params[3],
+                                params[4], params[5], params[6], mu[0], mu[1],
+                                mu[2], n_peak)) ** 2)
+
+      continue
+
+    weight = 1.2 * weight if new_residuals < residuals else 0.5 * weight
+    params -= weight * periodic_gaussian_derivative(
+      x_data, y_data, params[0], params[1], params[2], params[3], params[4],
+      params[5], params[6], mu[0], mu[1], mu[2], n_peak)
+    residuals = new_residuals
+    new_residuals = np.sum((y_data - periodic_gaussian_jit(
+      x_data, params[0], params[1], params[2], params[3], params[4], params[5],
+      params[6], mu[0], mu[1], mu[2], n_peak)) ** 2)
+
+  return params, new_residuals
+
+
+def newton_fit_map(args):
+  """"""
+
+  i, (n_peak, maxima, x_data, y_data, params, thresh, max_iter) = args
+  n_peaks = np.count_nonzero(np.invert(np.isnan(maxima)))
+
+  mu = np.zeros((3,))
+
+  if n_peaks == 1:
+    mu[0] = maxima[0]
+  elif n_peaks == 2:
+    mu[0] = maxima[0]
+    mu[1] = maxima[1]
+  elif n_peaks == 3:
+    mu[0] = maxima[0]
+    mu[1] = maxima[1]
+    mu[2] = maxima[2]
+
+  return i, optimized(n_peak, x_data, y_data, params, mu, thresh, max_iter)
+
+
+def fit_curve_newton(maxima, gabor, ang_steps, guess_amp, guess_sigma,
+                     guess_offset, thresh, max_iter):
+  """"""
+
+  ret = np.zeros((*gabor.shape[:2], 7))
+  residuals = np.zeros(gabor.shape[:2])
+  ret[:, :, 0] = np.inf
+  ret[:, :, 2] = np.inf
+  ret[:, :, 4] = np.inf
+
+  guess = np.zeros_like(ret)
+  guess[:, :, 0:6:2] = guess_sigma
+  guess[:, :, 1:6:2] = guess_amp
+  guess[:, :, -1] = guess_offset
+
+  n_peak = np.count_nonzero(np.invert(np.isnan(maxima)), axis=2)
+
+  pool_iterables = enumerate(zip(
+    n_peak.flatten(),
+    maxima.reshape(-1, *maxima.shape[2:]),
+    repeat(ang_steps),
+    gabor.reshape(-1, *gabor.shape[2:]),
+    guess.reshape(-1, *guess.shape[2:]),
+    repeat(thresh),
+    repeat(max_iter)))
+
+  with ProcessPoolExecutor(max_workers=8) as executor:
+    for i, (vals, res) in tqdm(executor.map(newton_fit_map,
+                                            pool_iterables),
+                               total=prod(gabor.shape[:2]),
+                               desc='Gaussian interpolation',
+                               file=sys.stdout,
+                               colour='green'):
+      ret[*np.unravel_index(i, gabor.shape[:2])] = vals
+      residuals[*np.unravel_index(i, gabor.shape[:2])] = res
 
   return ret, residuals
 
