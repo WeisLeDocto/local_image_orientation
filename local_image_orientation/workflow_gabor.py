@@ -22,6 +22,7 @@ import cupyx.scipy.signal as gpu_signal
 import cupy as cp
 import cucim.skimage.filters as gpu_filters
 from time import time
+from multiprocessing import cpu_count
 
 matplotlib.use('TkAgg')
 
@@ -66,7 +67,7 @@ def process_gabor(image, n_ang, n_pix):
   pool_iterables = zip(repeat(n_pix),
                        np.linspace(0, np.pi, n_ang),
                        repeat(image))
-  with ProcessPoolExecutor(max_workers=8) as executor:
+  with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
     for i, gab in tqdm(enumerate(executor.map(convolve_gabor,
                                               pool_iterables)),
                        total=n_ang,
@@ -307,7 +308,7 @@ def fit_curve(maxima, gabor, ang_steps, guess_amp, guess_sigma, guess_offset):
     guess.reshape(-1, *guess.shape[2:]),
     bounds.reshape(-1, *bounds.shape[2:])))
 
-  with ProcessPoolExecutor(max_workers=8) as executor:
+  with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
     for i, (vals, _, info_dict, *_) in tqdm(executor.map(curve_fit_wrapper,
                                                          pool_iterables),
                                             total=prod(gabor.shape[:2]),
@@ -425,7 +426,7 @@ def fit_curve_newton(maxima, gabor, ang_steps, guess_amp, guess_sigma,
     repeat(thresh),
     repeat(max_iter)))
 
-  with ProcessPoolExecutor(max_workers=8) as executor:
+  with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
     for i, (vals, res) in tqdm(executor.map(newton_fit_map,
                                             pool_iterables),
                                total=prod(gabor.shape[:2]),
