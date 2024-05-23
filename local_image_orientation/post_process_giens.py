@@ -37,7 +37,9 @@ if __name__ == '__main__':
                         total=len(images),
                         desc='Converting to HDR',
                         file=sys.stdout,
-                        colour='green'):
+                        colour='green',
+                        mininterval=0.01,
+                        maxinterval=0.1):
       i: int
       step: Tuple[Path, ...]
 
@@ -63,7 +65,9 @@ if __name__ == '__main__':
                          total=len(images),
                          desc='Applying Gabor filter',
                          file=sys.stdout,
-                         colour='green'):
+                         colour='green',
+                         mininterval=0.01,
+                         maxinterval=0.1):
       img_path: Path
 
       img = np.load(img_path)
