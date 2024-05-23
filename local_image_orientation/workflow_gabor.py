@@ -23,6 +23,7 @@ import cupy as cp
 import cucim.skimage.filters as gpu_filters
 from time import time
 from multiprocessing import cpu_count
+from warnings import warn
 
 matplotlib.use('TkAgg')
 
@@ -226,6 +227,10 @@ def search_maxima(input_aray, angle_step):
       to_search,
       prominence=0.05 * (np.max(input_aray[x, y]) - min_val),
       width=(None, None), height=(None, None))
+
+    if not peak_index.any():
+      warn(f'Could not find peak for pixel in position {x, y}', RuntimeWarning)
+      continue
 
     widths, width_heights, *_ = peak_widths(to_search, peak_index,
                                             rel_height=0.5)
