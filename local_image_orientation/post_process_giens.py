@@ -54,7 +54,6 @@ if __name__ == '__main__':
                                    tuple(int(fullmatch(r'\d+_(\d+)\.npy',
                                                        img.name).groups()[0])
                                          for img in step))
-      hdr = ((hdr - hdr.min()) / (hdr.max() - hdr.min())).astype('float64')
 
       name = fullmatch(r'(\d+)_\d+\.npy', step[0].name).groups()[0]
       np.save(hdr_path / f'{i}_{name}.npy', hdr)
