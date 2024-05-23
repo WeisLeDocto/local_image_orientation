@@ -206,6 +206,20 @@ def periodic_gaussian_derivative(x, y, sigma_1, a_1, sigma_2, a_2, sigma_3,
                      -2 * np.sum(diff)))
 
 
+def search_maxima_wrapper(args):
+  """"""
+
+  img_path, ang = args
+
+  img = np.load(img_path)
+
+  peak_idx, amp, sigma, offset = search_maxima(img, ang[1] - ang[0])
+  peaks = ang[peak_idx]
+  peaks[peak_idx == -1] = np.nan
+
+  return img_path, peaks, amp, sigma, offset
+
+
 def search_maxima(input_aray, angle_step):
   """"""
 

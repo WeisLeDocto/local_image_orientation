@@ -9,11 +9,13 @@ from tqdm import tqdm
 import sys
 from typing import Tuple
 import matplotlib
-from matplotlib import pyplot as plt
-from time import sleep
+from matplotlib import animation as anim, pyplot as plt
+from concurrent.futures import ProcessPoolExecutor
+from itertools import repeat
+from multiprocessing import cpu_count
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-
-from workflow_gabor import process_gabor_gpu
+from workflow_gabor import process_gabor_gpu, search_maxima_wrapper, fit_curve
 
 matplotlib.use('TkAgg')
 
@@ -25,6 +27,8 @@ nb_ang = 45
 nb_pix = 15
 
 if __name__ == '__main__':
+
+  ang = np.linspace(0, 180, nb_ang)
 
   images_path = base_path / 'images'
   hdr_path = base_path / 'hdr'
@@ -87,3 +91,117 @@ if __name__ == '__main__':
       res = process_gabor_gpu(intensity, nb_ang, nb_pix)
 
       np.save(gabor_path / img_path.name, res)
+
+  if True:
+    peak_path.mkdir(parents=False, exist_ok=True)
+
+    images = tuple(sorted(gabor_path.glob('*.npy')))
+
+    with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
+      for img_path, peaks, amp, sigma, offset in tqdm(
+          executor.map(search_maxima_wrapper, zip(images, repeat(ang))),
+          total=len(images),
+          desc='Detecting peaks',
+          file=sys.stdout,
+          colour='green'):
+
+        np.savez(peak_path / f'{img_path.stem}.npz', peaks, amp, sigma, offset)
+
+  if True:
+
+    def sort_images(path: Path):
+      """"""
+
+      sec, = fullmatch(r'(\d+)_\d+\.npy', path.name).groups()
+      return int(sec)
+
+    images = tuple(sorted(gabor_path.glob('*.npy'), key=sort_images))
+    hdrs = tuple(sorted(hdr_path.glob('*.npy'), key=sort_images))
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
+    ax1.axis('off')
+    ax2.axis('off')
+    img1 = ax1.imshow(ang[np.argmax(np.load(images[0]), axis=2)],
+                      cmap='twilight', clim=(0, 180))
+    divider_1 = make_axes_locatable(ax1)
+    cax1 = divider_1.append_axes('bottom', size='5%', pad=0.05)
+    fig.colorbar(img1, cax=cax1, orientation='horizontal')
+    img2 = ax2.imshow(np.load(hdrs[0]), cmap='grey', clim=(0, 1))
+    divider_2 = make_axes_locatable(ax2)
+    cax2 = divider_2.append_axes('bottom', size='5%', pad=0.05)
+    fig.colorbar(img2, cax=cax2, orientation='horizontal')
+
+
+    def update(frame):
+      """"""
+
+      img1.set_array(ang[np.argmax(np.load(images[frame + 1]), axis=2)])
+      img2.set_array(np.load(hdrs[frame + 1]))
+      return img1, img2
+
+
+    ani = anim.FuncAnimation(fig=fig, func=update, frames=len(images) - 1,
+                             interval=500, repeat=True, repeat_delay=2000)
+    ani.save("orientation_2.mkv", writer='ffmpeg', fps=2)
+    plt.show()
+
+    fig, ax = plt.subplots()
+    img = plt.imshow(np.average(np.load(images[0]), axis=2),
+                     cmap='plasma', clim=(0, 0.25))
+    bar = plt.colorbar()
+
+
+    def update(frame):
+      """"""
+
+      img.set_array(np.average(np.load(images[frame + 1]), axis=2))
+      img.set_clim(0, 0.25)
+      return img
+
+
+    ani = anim.FuncAnimation(fig=fig, func=update, frames=len(images) - 1,
+                             interval=500, repeat=False)
+    ani.save("intensity.gif", writer='imagemagick', fps=2)
+    plt.show()
+
+    images = tuple(sorted(hdr_path.glob('*.npy'), key=sort_images))
+
+    fig, ax = plt.subplots()
+    img = plt.imshow(np.load(images[0]), cmap='plasma')
+    bar = plt.colorbar()
+
+
+    def update(frame):
+      """"""
+
+      img.set_array(np.load(images[frame + 1]))
+      return img
+
+
+    ani = anim.FuncAnimation(fig=fig, func=update, frames=len(images) - 1,
+                             interval=500, repeat=True)
+    ani.save("raw_hdr.gif", writer='imagemagick', fps=2)
+    plt.show()
+
+  if True:
+    fit_path.mkdir(parents=False, exist_ok=True)
+    images_names = tuple(path.stem for path in peak_path.glob('*.npz'))
+
+    for img_name in tqdm(images_names,
+                         total=len(images_names),
+                         desc='Fitting Gaussian curves',
+                         file=sys.stdout,
+                         colour='green'):
+      data = np.load(peak_path / f'{img_name}.npz')
+      peaks, amp, sigma, offset = (data['arr_0'], data['arr_1'],
+                                   data['arr_2'], data['arr_3'])
+      res = np.load(gabor_path / f'{img_name}.npy')
+
+      fit, residual = fit_curve(peaks * np.pi / 180,
+                                res,
+                                ang * np.pi / 180,
+                                amp,
+                                sigma,
+                                offset)
+
+      np.savez(fit_path / f'{img_name}.npz', fit, residual)
