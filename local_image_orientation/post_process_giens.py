@@ -27,9 +27,12 @@ nb_pix = 15
 if __name__ == '__main__':
 
   images_path = base_path / 'images'
+  hdr_path = base_path / 'hdr'
+  gabor_path = base_path / 'gabor'
+  peak_path = base_path / 'peaks'
+  fit_path = base_path / 'fit'
 
   if True:
-    hdr_path = base_path / 'hdr'
     hdr_path.mkdir(parents=False, exist_ok=True)
 
     images = tuple(batched(sorted(images_path.glob('*.npy')), n_images))
@@ -57,7 +60,6 @@ if __name__ == '__main__':
       np.save(hdr_path / f'{i}_{name}.npy', hdr)
 
   if True:
-    gabor_path = base_path / 'gabor'
     gabor_path.mkdir(parents=False, exist_ok=True)
 
     images = tuple(sorted(hdr_path.glob('*.npy')))
