@@ -38,6 +38,7 @@ if __name__ == '__main__':
   gabor_path = base_path / 'gabor'
   peak_path = base_path / 'peaks'
   fit_path = base_path / 'fit'
+  anim_path = base_path / 'anim'
 
   if True:
     hdr_path.mkdir(parents=False, exist_ok=True)
@@ -126,6 +127,7 @@ if __name__ == '__main__':
         np.savez(peak_path / f'{img_path.stem}.npz', peaks, amp, sigma, offset)
 
   if True:
+    anim_path.mkdir(parents=False, exist_ok=True)
 
     def sort_images(path: Path):
       """"""
@@ -160,7 +162,7 @@ if __name__ == '__main__':
 
     ani = anim.FuncAnimation(fig=fig, func=update, frames=len(images) - 1,
                              interval=500, repeat=True, repeat_delay=2000)
-    ani.save("orientation_2.mkv", writer='ffmpeg', fps=2)
+    ani.save(anim_path / "orientation_2.mkv", writer='ffmpeg', fps=2)
     plt.show()
 
     fig, ax = plt.subplots()
@@ -179,7 +181,7 @@ if __name__ == '__main__':
 
     ani = anim.FuncAnimation(fig=fig, func=update, frames=len(images) - 1,
                              interval=500, repeat=False)
-    ani.save("intensity.gif", writer='imagemagick', fps=2)
+    ani.save(anim_path / "intensity.gif", writer='imagemagick', fps=2)
     plt.show()
 
     images = tuple(sorted(hdr_path.glob('*.npy'), key=sort_images))
@@ -198,7 +200,7 @@ if __name__ == '__main__':
 
     ani = anim.FuncAnimation(fig=fig, func=update, frames=len(images) - 1,
                              interval=500, repeat=True)
-    ani.save("raw_hdr.gif", writer='imagemagick', fps=2)
+    ani.save(anim_path / "raw_hdr.gif", writer='imagemagick', fps=2)
     plt.show()
 
   if True:
