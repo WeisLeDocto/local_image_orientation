@@ -251,6 +251,9 @@ def periodic_gaussian_derivative(x, y, sigma_1, a_1, sigma_2, a_2, sigma_3,
 def gradient_descent(n_peak, x_data, y_data, params, mu, thresh, max_iter):
   """"""
 
+  if n_peak == 0:
+    return params
+
   buf = cuda.local.array((NB_ANGLES,), dtype=types.float32)
   buf_7 = cuda.local.array((7,), dtype=types.float32)
 
