@@ -14,11 +14,14 @@ from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 from multiprocessing import cpu_count
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from numba import cuda
+import math
 import cucim.skimage.filters as gpu_filters
 import cupy as cp
 from time import time
 
 from workflow_gabor import process_gabor_gpu, search_maxima_wrapper, fit_curve
+from fit_gpu_numba import fit_gpu
 
 matplotlib.use('TkAgg')
 
@@ -217,11 +220,23 @@ if __name__ == '__main__':
                                    data['arr_2'], data['arr_3'])
       res = np.load(gabor_path / f'{img_name}.npy')
 
-      fit, residual = fit_curve(peaks * np.pi / 180,
-                                res,
-                                ang * np.pi / 180,
-                                amp,
-                                sigma,
-                                offset)
+      tpb = (16, 16)
+      bpg = (int(math.ceil(res.shape[0] / tpb[0])),
+             int(math.ceil(res.shape[1] / tpb[1])))
 
-      np.savez(fit_path / f'{img_name}.npz', fit, residual)
+      n_peaks = np.count_nonzero(np.invert(np.isnan(peaks)), axis=-1)
+      param = np.zeros((*n_peaks.shape, 7))
+      param[:, :, 0:6:2] = sigma[:, :]
+      param[:, :, 1:6:2] = amp[:, :]
+      param[:, :, -1] = offset[:, :]
+
+      n_gpu = cuda.to_device(n_peaks.astype(np.float32))
+      x_gpu = cuda.to_device(np.radians(ang).astype(np.float32))
+      y_gpu = cuda.to_device(res.astype(np.float32))
+      p_gpu = cuda.to_device(param.astype(np.float32))
+      m_gpu = cuda.to_device(np.radians(peaks).astype(np.float32))
+      fit_gpu[bpg, tpb](n_gpu, x_gpu, y_gpu, p_gpu, m_gpu, 1e-6, 5000)
+
+      param = p_gpu.copy_to_host()
+
+      np.save(fit_path / f'{img_name}.npy', param)
