@@ -14,6 +14,9 @@ from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 from multiprocessing import cpu_count
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import cucim.skimage.filters as gpu_filters
+import cupy as cp
+from time import time
 
 from workflow_gabor import process_gabor_gpu, search_maxima_wrapper, fit_curve
 
@@ -65,6 +68,19 @@ if __name__ == '__main__':
   if True:
     gabor_path.mkdir(parents=False, exist_ok=True)
 
+    print('\nSetting convolution kernels')
+    t0 = time()
+    kernels = {i: gpu_filters.gabor_kernel(frequency=1 / nb_pix,
+                                           theta=np.pi / 2 - ang,
+                                           n_stds=3,
+                                           offset=0,
+                                           bandwidth=1,
+                                           dtype=cp.complex64,
+                                           sigma_x=4,
+                                           sigma_y=7.5)
+               for i, ang in enumerate(np.linspace(0, np.pi, nb_ang))}
+    print(f'Set convolution kernels in {time() - t0:.2f}s\n')
+
     images = tuple(sorted(hdr_path.glob('*.npy')))
     for img_path in tqdm(images,
                          total=len(images),
@@ -77,7 +93,7 @@ if __name__ == '__main__':
 
       img = np.load(img_path)
 
-      res = process_gabor_gpu(img, nb_ang, nb_pix)
+      res = process_gabor_gpu(img, kernels, nb_ang)
       intensity = np.max(res, axis=2) / np.min(img[img > 0])
 
       intensity[intensity < np.percentile(intensity, 2)] = np.percentile(
@@ -88,9 +104,11 @@ if __name__ == '__main__':
       intensity = ((intensity - intensity.min()) /
                    (intensity.max() - intensity.min())).astype('float64')
 
-      res = process_gabor_gpu(intensity, nb_ang, nb_pix)
+      res = process_gabor_gpu(intensity, kernels, nb_ang)
 
       np.save(gabor_path / img_path.name, res)
+
+    del kernels
 
   if True:
     peak_path.mkdir(parents=False, exist_ok=True)

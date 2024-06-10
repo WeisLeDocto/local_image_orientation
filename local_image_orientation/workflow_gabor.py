@@ -80,26 +80,18 @@ def process_gabor(image, n_ang, n_pix):
   return res
 
 
-def process_gabor_gpu(image, n_ang, n_pix):
+def process_gabor_gpu(image, kernels, n_ang):
   """"""
 
   img_gpu = cp.asarray(image, dtype='float32')
   res = cp.zeros(shape=(*image.shape, n_ang), dtype='float32')
-  for i, ang in tqdm(enumerate(np.linspace(0, np.pi, n_ang)),
-                     total=n_ang,
-                     desc='Gabor kernel convolution',
-                     file=sys.stdout,
-                     colour='green',
-                     mininterval=0.01,
-                     maxinterval=0.1):
-    kernel = gpu_filters.gabor_kernel(frequency=1 / n_pix,
-                                      theta=np.pi / 2 - ang,
-                                      n_stds=3,
-                                      offset=0,
-                                      bandwidth=1,
-                                      dtype=cp.complex64,
-                                      sigma_x=4,
-                                      sigma_y=7.5)
+  for i, kernel in tqdm(kernels.items(),
+                        total=n_ang,
+                        desc='Gabor kernel convolution',
+                        file=sys.stdout,
+                        colour='green',
+                        mininterval=0.01,
+                        maxinterval=0.1):
     conv = gpu_signal.convolve2d(img_gpu,
                                  kernel,
                                  mode='same',
