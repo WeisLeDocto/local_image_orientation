@@ -91,6 +91,7 @@ def find_peaks_gpu(gabor_data_cpu, ang_cpu):
 
   deviation_final[invalid_peak_mask_final] = cp.nan
   heights_final[invalid_peak_mask_final] = cp.nan
+  peak_value_final[invalid_peak_mask_final] = cp.nan
   del invalid_peak_mask_final
 
   params = cp.full((*gabor_data.shape[:2], 7), -1, dtype=cp.float32)
