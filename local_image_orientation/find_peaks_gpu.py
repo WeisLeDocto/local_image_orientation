@@ -40,8 +40,8 @@ def find_peaks(gabor_data_cpu, ang_cpu):
 
   min_prominence = 0.05 * (cp.max(gabor_data, axis=2) - min_val)
   prominence_mask = prominences < min_prominence
-  peak_mask[prominence_mask] = -1
-  prominences[prominence_mask] = -1
+  peak_mask[prominence_mask] = 0
+  prominences[prominence_mask] = 0
   del min_prominence, prominence_mask
 
   widths = cp.zeros_like(gabor_data, dtype=cp.float32)
@@ -60,14 +60,14 @@ def find_peaks(gabor_data_cpu, ang_cpu):
   del prominences
 
   heights_final = cp.take_along_axis(heights, sorted_order, axis=2)[:, :, :3]
-  heights_final[heights_final < 0] = 1
+  heights_final[heights_final <= 0] = 1
   del heights
   widths_final = cp.take_along_axis(widths, sorted_order, axis=2)[:, :, :3]
-  widths_final[widths_final < 0] = 1
+  widths_final[widths_final <= 0] = 1
   del widths
   width_heights_final = cp.take_along_axis(width_heights, sorted_order,
                                            axis=2)[:, :, :3]
-  width_heights_final[width_heights_final < 0] = 1
+  width_heights_final[width_heights_final <= 0] = 1
   del width_heights
 
   deviation_final = widths_final / (2 * cp.sqrt(cp.log(heights_final /
@@ -84,7 +84,7 @@ def find_peaks(gabor_data_cpu, ang_cpu):
 
   peak_value_final = ang[peak_index_final]
 
-  invalid_peak_mask_final = peak_mask_final < 0
+  invalid_peak_mask_final = peak_mask_final <= 0
   del peak_mask_final
 
   peak_index_final[invalid_peak_mask_final] = cp.nan
