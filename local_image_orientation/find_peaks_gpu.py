@@ -112,9 +112,10 @@ def rearrange(array_in, min_idx, array_out):
   if x < array_in.shape[0] and y < array_in.shape[1]:
     dim = array_in.shape[2]
     idx = min_idx[x, y]
-    # todo
-    array_out[x, y, :dim - idx] = array_in[x, y, idx:]
-    array_out[x, y, dim - idx:] = array_in[x, y, :idx]
+    for i in range(dim - idx):
+      array_out[x, y, i] = array_in[x, y, idx + i]
+    for i in range(idx):
+      array_out[x, y, dim - idx + i] = array_in[x, y, i]
 
 
 @cuda.jit(types.void(types.int32[:, :, :], types.int32[:, :, :]))
