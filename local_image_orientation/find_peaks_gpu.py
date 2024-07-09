@@ -6,7 +6,7 @@ import cupy as cp
 import math
 
 
-def find_peaks(gabor_data_cpu, ang_cpu):
+def find_peaks_gpu(gabor_data_cpu, ang_cpu):
   """"""
 
   gabor_data = cp.asarray(gabor_data_cpu, dtype=cp.float32)
