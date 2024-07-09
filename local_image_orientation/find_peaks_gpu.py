@@ -39,7 +39,7 @@ def find_peaks_gpu(gabor_data_cpu, ang_cpu):
   min_val = cp.min(gabor_data, axis=2)
 
   min_prominence = 0.05 * (cp.max(gabor_data, axis=2) - min_val)
-  prominence_mask = prominences < min_prominence
+  prominence_mask = prominences < min_prominence[:, :, cp.newaxis]
   peak_mask[prominence_mask] = 0
   prominences[prominence_mask] = 0
   del min_prominence, prominence_mask
@@ -52,9 +52,9 @@ def find_peaks_gpu(gabor_data_cpu, ang_cpu):
 
   del left_bases, right_bases
 
-  heights = to_search - min_val
+  heights = to_search - min_val[:, :, cp.newaxis]
   widths *= cp.radians(ang[1] - ang[0])
-  width_heights -= min_val
+  width_heights -= min_val[:, :, cp.newaxis]
 
   sorted_order = cp.argsort(prominences, axis=2)[:, :, ::-1]
   del prominences
@@ -79,7 +79,8 @@ def find_peaks_gpu(gabor_data_cpu, ang_cpu):
   del peak_mask
 
   peak_index = sorted_order[:, :, :3]
-  peak_index_final = (peak_index + min_idx) % to_search.shape[2]
+  peak_index_final = (peak_index +
+                      min_idx[:, :, cp.newaxis]) % to_search.shape[2]
   del peak_index, min_idx, to_search, sorted_order
 
   peak_value_final = ang[peak_index_final]
