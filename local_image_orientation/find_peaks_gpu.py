@@ -87,7 +87,7 @@ def find_peaks(gabor_data_cpu, ang_cpu):
   invalid_peak_mask_final = peak_mask_final <= 0
   del peak_mask_final
 
-  peak_index_final[invalid_peak_mask_final] = cp.nan
+  peak_index_final[invalid_peak_mask_final] = -1
   deviation_final[invalid_peak_mask_final] = cp.nan
   heights_final[invalid_peak_mask_final] = cp.nan
   del invalid_peak_mask_final
