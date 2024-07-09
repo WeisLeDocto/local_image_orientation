@@ -56,7 +56,7 @@ def find_peaks(gabor_data_cpu, ang_cpu):
   widths *= cp.radians(ang[1] - ang[0])
   width_heights -= min_val
 
-  sorted_order = cp.argsort(prominences, axis=2)
+  sorted_order = cp.argsort(prominences, axis=2)[:, :, ::-1]
   del prominences
 
   heights_final = cp.take_along_axis(heights, sorted_order, axis=2)[:, :, :3]
