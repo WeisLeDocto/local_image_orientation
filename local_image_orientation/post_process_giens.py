@@ -10,9 +10,6 @@ import sys
 from typing import Tuple
 import matplotlib
 from matplotlib import animation as anim, pyplot as plt
-from concurrent.futures import ProcessPoolExecutor
-from itertools import repeat
-from multiprocessing import cpu_count
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from numba import cuda
 import math
@@ -20,8 +17,9 @@ import cucim.skimage.filters as gpu_filters
 import cupy as cp
 from time import time
 
-from workflow_gabor import process_gabor_gpu, search_maxima_wrapper, fit_curve
+from workflow_gabor import process_gabor_gpu
 from fit_gpu_numba import fit_gpu
+from find_peaks_gpu import find_peaks_gpu
 
 matplotlib.use('TkAgg')
 
@@ -116,18 +114,15 @@ if __name__ == '__main__':
 
   if True:
     peak_path.mkdir(parents=False, exist_ok=True)
+    gabor_data = tuple(sorted(gabor_path.glob('*.npy')))
 
-    images = tuple(sorted(gabor_path.glob('*.npy')))
+    mem_pool = cp.get_default_memory_pool()
 
-    with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
-      for img_path, peaks, amp, sigma, offset in tqdm(
-          executor.map(search_maxima_wrapper, zip(images, repeat(ang))),
-          total=len(images),
-          desc='Detecting peaks',
-          file=sys.stdout,
-          colour='green'):
-
-        np.savez(peak_path / f'{img_path.stem}.npz', peaks, amp, sigma, offset)
+    for path in tqdm(gabor_data, total=len(gabor_data), desc='Detecting peaks',
+                     file=sys.stdout, colour='green'):
+      peaks, params = find_peaks_gpu(np.load(path), ang)
+      np.savez(peak_path / f'{path.stem}.npz', peaks, params)
+      mem_pool.free_all_blocks()
 
   if True:
     anim_path.mkdir(parents=False, exist_ok=True)
@@ -216,8 +211,7 @@ if __name__ == '__main__':
                          file=sys.stdout,
                          colour='green'):
       data = np.load(peak_path / f'{img_name}.npz')
-      peaks, amp, sigma, offset = (data['arr_0'], data['arr_1'],
-                                   data['arr_2'], data['arr_3'])
+      peaks, param = data['arr_0'], data['arr_1']
       res = np.load(gabor_path / f'{img_name}.npy')
 
       tpb = (16, 16)
@@ -240,3 +234,5 @@ if __name__ == '__main__':
       param = p_gpu.copy_to_host()
 
       np.save(fit_path / f'{img_name}.npy', param)
+
+      mem_pool.free_all_blocks()
