@@ -84,11 +84,11 @@ def find_peaks_gpu(gabor_data_cpu, ang_cpu):
   del peak_index, min_idx, to_search, sorted_order
 
   peak_value_final = ang[peak_index_final]
+  del peak_index_final
 
   invalid_peak_mask_final = peak_mask_final <= 0
   del peak_mask_final
 
-  peak_index_final[invalid_peak_mask_final] = -1
   deviation_final[invalid_peak_mask_final] = cp.nan
   heights_final[invalid_peak_mask_final] = cp.nan
   del invalid_peak_mask_final
@@ -101,7 +101,7 @@ def find_peaks_gpu(gabor_data_cpu, ang_cpu):
   params[:, :, 1:6:2] = heights_final
   del heights_final
 
-  return peak_index_final.get(), peak_value_final.get(), params.get()
+  return peak_value_final.get(), params.get()
 
 
 @cuda.jit(types.void(types.float32[:, :, :], types.int32[:, :],
