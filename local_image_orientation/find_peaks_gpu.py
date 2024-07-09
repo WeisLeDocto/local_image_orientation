@@ -20,13 +20,14 @@ def find_peaks(gabor_data_cpu, ang_cpu):
 
   min_idx = cp.argmin(gabor_data, axis=2, dtype=cp.int32)
   to_search = cp.empty_like(gabor_data, dtype=cp.float32)
-  rearrange(gabor_data, min_idx, to_search)
+  rearrange[bpg, tpb](gabor_data, min_idx, to_search)
 
   peaks = cp.empty_like(gabor_data, dtype=cp.int32)
   local_maxima_gpu[bpg, tpb](to_search, peaks)
 
   peak_mask = cp.empty_like(gabor_data, dtype=cp.int32)
   make_peak_mask(peaks, peak_mask)
+  make_peak_mask[bpg, tpb](peaks, peak_mask)
   del peaks
 
   prominences = cp.empty_like(gabor_data, dtype=cp.float32)
@@ -47,8 +48,8 @@ def find_peaks(gabor_data_cpu, ang_cpu):
   widths = cp.empty_like(gabor_data, dtype=cp.float32)
   width_heights = cp.empty_like(gabor_data, dtype=cp.float32)
 
-  peak_width_gpu(to_search, peak_mask, prominences, left_bases, right_bases,
-                 widths, width_heights)
+  peak_width_gpu[bpg, tpb](to_search, peak_mask, prominences, left_bases,
+                           right_bases, widths, width_heights)
 
   del left_bases, right_bases
 
