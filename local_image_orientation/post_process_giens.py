@@ -205,6 +205,8 @@ if __name__ == '__main__':
     fit_path.mkdir(parents=False, exist_ok=True)
     images_names = tuple(path.stem for path in peak_path.glob('*.npz'))
 
+    mem_pool = cp.get_default_memory_pool()
+
     for img_name in tqdm(images_names,
                          total=len(images_names),
                          desc='Fitting Gaussian curves',
