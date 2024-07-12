@@ -221,10 +221,6 @@ if __name__ == '__main__':
              int(math.ceil(res.shape[1] / tpb[1])))
 
       n_peaks = np.count_nonzero(np.invert(np.isnan(peaks)), axis=-1)
-      param = np.zeros((*n_peaks.shape, 7))
-      param[:, :, 0:6:2] = sigma[:, :]
-      param[:, :, 1:6:2] = amp[:, :]
-      param[:, :, -1] = offset[:, :]
 
       n_gpu = cuda.to_device(n_peaks.astype(np.float32))
       x_gpu = cuda.to_device(np.radians(ang).astype(np.float32))
